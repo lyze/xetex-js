@@ -1,0 +1,44 @@
+--- fontconfig-2.11.95/src/fcstat.c
++++ fontconfig-2.11.95/src/fcstat.c
+@@ -379,6 +379,8 @@
+ 	}
+
+ 	return ret;
++#  elif EMSCRIPTEN
++        return ret;
+ #  else
+ #    error "BUG: No way to figure out with fstatfs()"
+ #  endif
+@@ -399,17 +401,24 @@
+ FcBool
+ FcIsFsMmapSafe (int fd)
+ {
++#ifdef EMSCRIPTEN
++  return FcFalse;
++#else
+     FcStatFS statb;
+
+     if (FcFStatFs (fd, &statb) < 0)
+ 	return FcTrue;
+
+     return !statb.is_remote_fs;
++#endif
+ }
+
+ FcBool
+ FcIsFsMtimeBroken (const FcChar8 *dir)
+ {
++#ifdef EMSCRIPTEN
++  return FcFalse;
++#else
+     int fd = FcOpen ((const char *) dir, O_RDONLY);
+
+     if (fd != -1)
+@@ -425,6 +434,7 @@
+     }
+
+     return FcFalse;
++#endif
+ }
+
+ #define __fcstat__
