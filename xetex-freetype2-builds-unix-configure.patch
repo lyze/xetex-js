@@ -1,0 +1,14 @@
+--- xetex-0.9999.3/source/libs/freetype2/freetype-2.4.11/builds/unix/configure
++++ xetex-0.9999.3/source/libs/freetype2/freetype-2.4.11/builds/unix/configure
+@@ -4245,8 +4245,9 @@
+ eval `cat conftest.sh`
+ rm -f conftest.* $ac_clean_files
+
+-if test x != "x${ac_cpp_ft_sizeof_int}" \
+-   -a x != x"${ac_cpp_ft_sizeof_long}"; then
++# if test x != "x${ac_cpp_ft_sizeof_int}" \
++#    -a x != x"${ac_cpp_ft_sizeof_long}"; then
++if true; then
+   unset ft_use_autoconf_sizeof_types
+ else
+   ft_use_autoconf_sizeof_types=yes

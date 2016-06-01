@@ -131,7 +131,7 @@ $(LIB_FONTCONFIG): $(EXPAT_BUILD_DIR).libs/libexpat.a $(LIB_FREETYPE)
 
 $(XETEX_SOURCE_DIR)build.sh: $(XETEX_ARCHIVE)
 	tar xf $<
-	test -f $@
+	patch -p0 < xetex-freetype2-builds-unix-configure.patch
 	touch $@
 
 # Unfortunately, web2c is not packaged as standalone anymore, so we need
@@ -168,14 +168,18 @@ native.stamp: $(NATIVE_DIR)
 $(LIB_FREETYPE): xetex.toplevel
 	echo '>>>' Making top-level xetex build directory...
 	$(MAKE) -C $(JS_DIR)libs
-	$(MAKE) -C $(JS_DIR)libs/freetype2/
+#	$(MAKE) -C $(JS_DIR)libs/freetype2/
 
 .INTERMEDIATE: xetex.toplevel
 xetex.toplevel: $(NATIVE_TOOLS)
 	mkdir -p $(JS_DIR)
-# need -Wno-error=implicit-function-declaration to get past a (v)snprintf configure check in kpathsea
-	cd $(JS_DIR) && emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS=-Wno-error=implicit-function-declaration
-	cd -
+# We need EMCONFIGURE_JS=2 to pass a configure check for fontconfig libraries
+# because we specified JavaScript version of fontconfig in the top-most
+# configuration. We need -Wno-error=implicit-function-declaration to get past a
+# (v)snprintf configure check in kpathsea. We define SIZEOF_LONG and SIZEOF_INT
+# because configure gives an *empty* result when using EMCONFIGURE_JS=2 for some
+# reason.
+	cd $(JS_DIR) && EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS='-Wno-error=implicit-function-declaration -DSIZEOF_LONG=4 -DSIZEOF_INT=4'
 	if EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); then \
 		echo '>>>' Made top-level succesfully.; \
 	else \
@@ -183,7 +187,7 @@ xetex.toplevel: $(NATIVE_TOOLS)
 		echo '>>>' Replacing freetype2 apinames binary from $(NATIVE_DIR)... && \
 		cp --preserve=mode $(NATIVE_DIR)libs/freetype2/ft-build/apinames $(JS_DIR)libs/freetype2/ft-build/apinames && \
 		echo '>>>' Restarting top-level make... && \
-		emmake $(MAKE) -C $(JS_DIR); \
+		EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); \
 	fi
 	touch $@
 
@@ -191,7 +195,7 @@ xetex.toplevel: $(NATIVE_TOOLS)
 $(XETEX_JS): xetex.toplevel $(NATIVE_TOOLS)
 	@echo '>>>' Building XeTeX with Emscripten...
 	@echo '>>>' Compiling XeTeX...
-	if emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; then \
+	if EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; then \
 		echo '>>>' Done!; \
 	else \
 		echo '>>>' First XeTeX make attempt failed. && \
@@ -201,5 +205,5 @@ $(XETEX_JS): xetex.toplevel $(NATIVE_TOOLS)
 		cp --preserve=mode $(NATIVE_WEB2C) $(JS_DIR)texk/web2c/ && \
 		cp --preserve=mode $(NATIVE_WEB2C_WEB2C) $(JS_DIR)texk/web2c/web2c/ && \
 		echo '>>>' Restarting XeTeX make... && \
-		emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; \
+		EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; \
 	fi
