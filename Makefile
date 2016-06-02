@@ -2,6 +2,12 @@
 MAKEFLAGS += --no-builtin-rules # --warn-undefined-variables
 .SUFFIXES:
 
+JS_CONFIG_SITE = config.site
+JS_CONFIG_SITE_ABS = $(realpath $(JS_CONFIG_SITE))
+ifeq ($(JS_CONFIG_SITE_ABS),)
+$(error Cannot find JS_CONFIG_SITE: $(JS_CONFIG_SITE))
+endif
+
 XETEX_ARCHIVE = xetex-0.9999.3.tar.bz2
 ifeq ($(realpath $(XETEX_ARCHIVE)),)
 $(error XeTeX archive does not exist: $(XETEX_ARCHIVE))
@@ -125,7 +131,8 @@ $(FONTCONFIG_SOURCE_DIR)configure: $(FONTCONFIG_ARCHIVE)
 # Use XeTeX's version of libfreetype
 $(LIB_FONTCONFIG): $(EXPAT_BUILD_DIR).libs/libexpat.a $(LIB_FREETYPE)
 	mkdir -p $(FONTCONFIG_BUILD_DIR)
-	cd $(FONTCONFIG_BUILD_DIR) && emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(JS_DIR)libs/freetype2/ -I$$OLDPWD/$(JS_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS="-DSIZEOF_VOID_P=4 -I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/" LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/
+# Uses SIZEOF_VOID_P overriden in config.site
+	cd $(FONTCONFIG_BUILD_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(JS_DIR)libs/freetype2/ -I$$OLDPWD/$(JS_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS=-I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/
 	emmake $(MAKE) -C $(FONTCONFIG_BUILD_DIR)
 	touch $@
 
@@ -177,17 +184,17 @@ xetex.toplevel: $(NATIVE_TOOLS)
 # because we specified JavaScript version of fontconfig in the top-most
 # configuration. We need -Wno-error=implicit-function-declaration to get past a
 # (v)snprintf configure check in kpathsea. We define SIZEOF_LONG and SIZEOF_INT
-# because configure gives an *empty* result when using EMCONFIGURE_JS=2 for some
-# reason.
-	cd $(JS_DIR) && EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS='-Wno-error=implicit-function-declaration -DSIZEOF_LONG=4 -DSIZEOF_INT=4'
-	if EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); then \
+# in a config.site because configure gives an *empty* result. This happens
+# because we did not especially compile and mount a filesystem, and it would be a hassle just for this configure check.
+	cd $(JS_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS=-Wno-error=implicit-function-declaration
+	if CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); then \
 		echo '>>>' Made top-level succesfully.; \
 	else \
 		echo '>>>' First top-level make attempt failed. && \
 		echo '>>>' Replacing freetype2 apinames binary from $(NATIVE_DIR)... && \
 		cp --preserve=mode $(NATIVE_DIR)libs/freetype2/ft-build/apinames $(JS_DIR)libs/freetype2/ft-build/apinames && \
 		echo '>>>' Restarting top-level make... && \
-		EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); \
+		CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); \
 	fi
 	touch $@
 
@@ -195,6 +202,7 @@ xetex.toplevel: $(NATIVE_TOOLS)
 $(XETEX_JS): xetex.toplevel $(NATIVE_TOOLS)
 	@echo '>>>' Building XeTeX with Emscripten...
 	@echo '>>>' Compiling XeTeX...
+	exit
 	if EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; then \
 		echo '>>>' Done!; \
 	else \
@@ -205,5 +213,5 @@ $(XETEX_JS): xetex.toplevel $(NATIVE_TOOLS)
 		cp --preserve=mode $(NATIVE_WEB2C) $(JS_DIR)texk/web2c/ && \
 		cp --preserve=mode $(NATIVE_WEB2C_WEB2C) $(JS_DIR)texk/web2c/web2c/ && \
 		echo '>>>' Restarting XeTeX make... && \
-		EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; \
+		EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; \
 	fi
