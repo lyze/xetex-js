@@ -30,27 +30,41 @@ NATIVE_DIR = build-native/
 JS_DIR = build-js/
 XETEX_JS = $(JS_DIR)texk/web2c/xetex
 
+# Emscripten recommends that we generate .so files over .a files.
 LIB_FREETYPE = $(JS_DIR)libs/freetype2/ft-build/.libs/libfreetype.a
-LIB_FONTCONFIG = $(FONTCONFIG_BUILD_DIR)src/.libs/libfontconfig.a
+LIB_EXPAT = $(EXPAT_BUILD_DIR).libs/libexpat.a
+# Using libfontconfig.a mysteriously fails with:
+# ```AssertionError: Failed to run LLVM optimizations:```
+LIB_FONTCONFIG = $(FONTCONFIG_BUILD_DIR)src/.libs/libfontconfig.so
 
-XETEX_CONF =								\
-	--enable-compiler-warnings=yes					\
-	--disable-all-pkgs						\
-	--enable-xetex							\
-	--enable-xdvipdfmx						\
-	--disable-ptex							\
-	--disable-shared						\
-	--disable-largefile						\
-	--disable-ipc							\
-	--enable-silent-rules						\
-	--enable-dump-share						\
-	--with-fontconfig-includes=$(abspath $(FONTCONFIG_SOURCE_DIR))	\
-	--with-fontconfig-libdir=$(abspath $(dir $(LIB_FONTCONFIG)))	\
-	--without-system-ptexenc					\
-	--without-system-kpathsea					\
+# Copied from xetex/build.sh.
+#
+# We use xetex's own freetype2 configuration. In order to do that, we build
+# libs/freetype2 first before building the rest of the tree. We also explicitly
+# hack in the dependency on libexpat.
+XETEX_CONF =										\
+	--enable-compiler-warnings=yes							\
+	--disable-all-pkgs								\
+	--enable-xetex									\
+	--enable-xdvipdfmx								\
+	--disable-ptex									\
+	--disable-native-texlive-build							\
+	--disable-largefile								\
+	--disable-ipc									\
+	--enable-silent-rules								\
+	--enable-dump-share								\
+	--with-fontconfig-includes=$(abspath $(FONTCONFIG_SOURCE_DIR))			\
+	--with-fontconfig-libdir='$(abspath $(dir $(LIB_FONTCONFIG)))			\
+		-L$(abspath $(dir $(LIB_EXPAT))) -lfontconfig -lexpat'			\
+	--with-freetype2-includes=$(abspath						\
+		$(XETEX_SOURCE_DIR)source/libs/freetype2/freetype-2.4.11/include/)	\
+	--with-freetype2-libdir=$(abspath $(JS_DIR)libs/freetype2/)			\
+	--without-system-ptexenc							\
+	--without-system-kpathsea							\
 	--without-mf-x-toolkit --without-x
 
-# apparently *just* --enable-web2c doesn't work and breaks the xetex build in a cryptic way "Cannot find install.texi"
+# Apparently *just* --enable-web2c doesn't work and breaks the xetex build in a
+# cryptic way "Cannot find install.texi"
 NATIVE_TOOLS_CONF =				\
 	--enable-compiler-warnings=yes		\
 	--disable-all-pkgs			\
@@ -96,50 +110,57 @@ endif
 .PHONY: all
 all: $(XETEX_JS)
 
+.PHONY: clean-js
+clean-js:
+	rm -rf $(EXPAT_SOURCE_DIR) $(EXPAT_BUILD_DIR)
+	rm -rf $(FONTCONFIG_SOURCE_DIR) $(EXPAT_BUILD_DIR)
+	rm -rf xetex-configured.stamp xetex-toplevel.stamp $(JS_DIR)
+
 .PHONY: clean
-clean:
-	rm -rf $(FREETYPE2_SOURCE_DIR) $(FONTCONFIG_DIR)
-	rm -rf $(NATIVE_DIR) $(JS_DIR) $(XETEX_SOURCE_DIR) xetex.toplevel
+clean: clean-js
+	rm -rf native.stamp $(NATIVE_DIR) $(XETEX_SOURCE_DIR)
 
 .PHONY: distclean
 distclean: clean
-	rm -f $(FREETYPE2_ARCHIVE) $(FONTCONFIG_ARCHIVE)
+	rm -f $(EXPAT_ARCHIVE) $(FONTCONFIG_ARCHIVE)
 	rm -f $(XETEX_ARCHIVE)
 
 $(EXPAT_ARCHIVE):
 	curl -L $(EXPAT_ARCHIVE_URL) -o $@
 
+.SECONDARY: $(EXPAT_SOURCE_DIR)configure
 $(EXPAT_SOURCE_DIR)configure: $(EXPAT_ARCHIVE)
 	tar xf $<
-	touch $@
+	test -s $@ && touch $@
 
-$(EXPAT_BUILD_DIR).libs/libexpat.a: $(EXPAT_SOURCE_DIR)configure
+$(LIB_EXPAT): $(EXPAT_SOURCE_DIR)configure
 	mkdir -p $(EXPAT_BUILD_DIR)
 	cd $(EXPAT_BUILD_DIR) && emconfigure $$OLDPWD/$(EXPAT_SOURCE_DIR)configure CFLAGS=-Wno-error=implicit-function-declaration
 	emmake $(MAKE) -C $(EXPAT_BUILD_DIR)
-	touch $@
+	test -s $@ && touch $@
 
 $(FONTCONFIG_ARCHIVE):
 	curl -L $(FONTCONFIG_ARCHIVE_URL) -o $@
 
+.SECONDARY: $(FONTCONFIG_SOURCE_DIR)configure
 $(FONTCONFIG_SOURCE_DIR)configure: $(FONTCONFIG_ARCHIVE)
 	tar xf $<
 	patch -p0 < fontconfig-fcstat.c.patch
 	patch -p0 < fontconfig-fcint.h.patch
-	touch $@
+	test -s $@ && touch $@
 
 # Use XeTeX's version of libfreetype
-$(LIB_FONTCONFIG): $(EXPAT_BUILD_DIR).libs/libexpat.a $(LIB_FREETYPE)
+$(LIB_FONTCONFIG): $(FONTCONFIG_SOURCE_DIR)configure $(LIB_EXPAT) $(LIB_FREETYPE)
 	mkdir -p $(FONTCONFIG_BUILD_DIR)
 # Uses SIZEOF_VOID_P overriden in config.site
-	cd $(FONTCONFIG_BUILD_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(JS_DIR)libs/freetype2/ -I$$OLDPWD/$(JS_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS=-I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/
+	cd $(FONTCONFIG_BUILD_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --disable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(JS_DIR)libs/freetype2/ -I$$OLDPWD/$(JS_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS=-I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/
 	emmake $(MAKE) -C $(FONTCONFIG_BUILD_DIR)
-	touch $@
+	test -s $@ && touch $@
 
 $(XETEX_SOURCE_DIR)build.sh: $(XETEX_ARCHIVE)
 	tar xf $<
 	patch -p0 < xetex-freetype2-builds-unix-configure.patch
-	touch $@
+	test -s $@ && touch $@
 
 # Unfortunately, web2c is not packaged as standalone anymore, so we need
 # reconfigure for the native platform.
@@ -160,7 +181,7 @@ $(NATIVE_TOOLS): native.stamp
 
 .INTERMEDIATE: native.stamp
 native.stamp: $(NATIVE_DIR)
-	@echo '>>>' Building native XeTeX distribution for compilation tools...)
+	@echo '>>>' Building native XeTeX distribution for compilation tools...
 	mkdir -p $(NATIVE_DIR)
 	cd $(NATIVE_DIR) && $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(NATIVE_TOOLS_CONF)
 	$(MAKE) -C $(NATIVE_DIR)
@@ -172,41 +193,43 @@ native.stamp: $(NATIVE_DIR)
 	$(MAKE) -C $(NATIVE_DIR)libs/icu/icu-build/
 	touch $@
 
-$(LIB_FREETYPE): xetex.toplevel
-	echo '>>>' Making top-level xetex build directory...
-	$(MAKE) -C $(JS_DIR)libs
-#	$(MAKE) -C $(JS_DIR)libs/freetype2/
+$(LIB_FREETYPE): xetex-configured.stamp
+	echo '>>>' Building xetex libraries...
+	if ! emmake $(MAKE) -C $(JS_DIR)libs; then \
+		echo '>>>' First make attempt for xetex libraries failed. && \
+		echo '>>>' Replacing freetype2 apinames binary from $(NATIVE_DIR)... && \
+		cp --preserve=mode $(NATIVE_DIR)libs/freetype2/ft-build/apinames $(JS_DIR)libs/freetype2/ft-build/apinames && \
+		emmake $(MAKE) -C $(JS_DIR)libs; \
+	fi
 
-.INTERMEDIATE: xetex.toplevel
-xetex.toplevel: $(NATIVE_TOOLS)
-	mkdir -p $(JS_DIR)
 # We need EMCONFIGURE_JS=2 to pass a configure check for fontconfig libraries
 # because we specified JavaScript version of fontconfig in the top-most
 # configuration. We need -Wno-error=implicit-function-declaration to get past a
 # (v)snprintf configure check in kpathsea. We define SIZEOF_LONG and SIZEOF_INT
 # in a config.site because configure gives an *empty* result. This happens
 # because we did not especially compile and mount a filesystem, and it would be a hassle just for this configure check.
+
+.SECONDARY: xetex-configured.stamp
+xetex-configured.stamp:
+	@echo '>>>' Configuring xetex...
+	mkdir -p $(JS_DIR)
 	cd $(JS_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS=-Wno-error=implicit-function-declaration
-	if CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); then \
-		echo '>>>' Made top-level succesfully.; \
-	else \
-		echo '>>>' First top-level make attempt failed. && \
-		echo '>>>' Replacing freetype2 apinames binary from $(NATIVE_DIR)... && \
-		cp --preserve=mode $(NATIVE_DIR)libs/freetype2/ft-build/apinames $(JS_DIR)libs/freetype2/ft-build/apinames && \
-		echo '>>>' Restarting top-level make... && \
-		CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR); \
-	fi
+	touch $@
+
+.SECONDARY: xetex-toplevel.stamp
+xetex-toplevel.stamp: xetex-configured.stamp $(LIB_FONTCONFIG) $(NATIVE_TOOLS)
+	@echo '>>>' Building xetex top level...
+	CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR)
 	touch $@
 
 # "Inject" native tools used in the compilation
-$(XETEX_JS): xetex.toplevel $(NATIVE_TOOLS)
-	@echo '>>>' Building XeTeX with Emscripten...
-	@echo '>>>' Compiling XeTeX...
-	exit
+$(XETEX_JS): xetex-toplevel.stamp $(NATIVE_TOOLS)
+	@echo '>>>' Building xetex...
+#	EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex
 	if EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; then \
 		echo '>>>' Done!; \
 	else \
-		echo '>>>' First XeTeX make attempt failed. && \
+		echo '>>>' First xetex make attempt failed. && \
 		echo '>>>' Replacing icu binaries from $(NATIVE_DIR)... && \
 		cp --preserve=mode $(NATIVE_ICU_TOOLS) $(JS_DIR)libs/icu/icu-build/bin/ && \
 		echo '>>>' Replacing web2c binaries from $(NATIVE_DIR)... && \

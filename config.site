@@ -2,3 +2,6 @@ ac_cv_sizeof_int=4
 ac_cv_sizeof_long=4
 ac_cv_sizeof_void_p=4
 ac_cv_sizeof_off_t=4
+
+# To pass a configure check for xdvipdfmx
+cho_cv_have_freetype=yes
