@@ -30,7 +30,7 @@ NATIVE_DIR = build-native/
 JS_DIR = build-js/
 XETEX_JS = $(JS_DIR)texk/web2c/xetex
 
-# Emscripten recommends that we generate .so files over .a files.
+# The Emscripten site recommends that we generate .so files over .a files...
 LIB_FREETYPE = $(JS_DIR)libs/freetype2/ft-build/.libs/libfreetype.a
 LIB_EXPAT = $(EXPAT_BUILD_DIR).libs/libexpat.a
 # Using libfontconfig.a mysteriously fails with:
@@ -205,15 +205,17 @@ $(LIB_FREETYPE): xetex-configured.stamp
 # We need EMCONFIGURE_JS=2 to pass a configure check for fontconfig libraries
 # because we specified JavaScript version of fontconfig in the top-most
 # configuration. We need -Wno-error=implicit-function-declaration to get past a
-# (v)snprintf configure check in kpathsea. We define SIZEOF_LONG and SIZEOF_INT
-# in a config.site because configure gives an *empty* result. This happens
-# because we did not especially compile and mount a filesystem, and it would be a hassle just for this configure check.
+# (v)snprintf configure check in kpathsea. We define ELIDE_CODE to avoid
+# duplicate symbols in kpathsea's own version of getopts. We define SIZEOF_LONG
+# and SIZEOF_INT in a config.site because configure gives an *empty* result.
+# This happens because we did not especially compile and mount a filesystem, and
+# it would be a hassle just for this configure check.
 
 .SECONDARY: xetex-configured.stamp
 xetex-configured.stamp:
 	@echo '>>>' Configuring xetex...
 	mkdir -p $(JS_DIR)
-	cd $(JS_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS=-Wno-error=implicit-function-declaration
+	cd $(JS_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS='-Wno-error=implicit-function-declaration -DELIDE_CODE'
 	touch $@
 
 .SECONDARY: xetex-toplevel.stamp
@@ -225,7 +227,6 @@ xetex-toplevel.stamp: xetex-configured.stamp $(LIB_FONTCONFIG) $(NATIVE_TOOLS)
 # "Inject" native tools used in the compilation
 $(XETEX_JS): xetex-toplevel.stamp $(NATIVE_TOOLS)
 	@echo '>>>' Building xetex...
-#	EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex
 	if EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex; then \
 		echo '>>>' Done!; \
 	else \
