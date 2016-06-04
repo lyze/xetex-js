@@ -161,7 +161,6 @@ $(FONTCONFIG_ARCHIVE):
 $(FONTCONFIG_SOURCE_DIR)configure: $(FONTCONFIG_ARCHIVE)
 	tar xf $<
 	patch -p0 < fontconfig-fcstat.c.patch
-	patch -p0 < fontconfig-fcint.h.patch
 	test -s $@ && touch $@
 
 # Use XeTeX's version of libfreetype
