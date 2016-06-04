@@ -1,25 +1,56 @@
 <html>
+  <head>
+    <script src="../xetex.umd.js"></script>
+    <script>
+      var xetex = new xetex.XeTeX('../xetex.worker.js', function (e) {
+        var response = e.data;
+        switch (response.channel) {
+          case 'stdout':
+            console.log(response.data);
+            break;
+
+          case 'stderr':
+            console.warn(response.data);
+            break;
+
+          default:
+            console.error('Unknown channel: ' + response.channel);
+        }
+      });
+      document.addEventListener('DOMContentLoaded', function (event) {
+        var form = document.getElementById('form');
+        var sourceTextArea = document.getElementById('source');
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          xetex.sendMessage({
+            namespace: 'FS', command: 'createDataFile',
+            arguments: ['/', 'source.tex', sourceTextArea.value, true, true],
+            // Since the result of createDataFile can't be cloned (and thus
+            // cannot be passed back from the worker), make this our return value
+            ret: null
+          }).then(function (result) {
+            console.log('FS.createDataFile', result);
+          }, function (error) {
+            console.log('FS.createDataFile', error);
+          });
+          xetex.sendMessage({
+            namespace: 'Module', command: 'callMain',
+            arguments: [['-interaction=nonstopmode', 'source.tex']]
+          }).then(function (result) {
+            console.log('Module.callMain', result);
+          }, function (error) {
+            console.error('Module.callMain', error);
+          });
+        });
+      });
+    </script>
+  </head>
   <body>
-    <label for="source-textarea">Source</label>
-    <textarea id="source-textarea"></textarea>
+    <form id="form">
+      <label for="source">Source</label>
+      <textarea id="source"></textarea>
+      <input type="submit" value="Compile">
+    </form>
+
   </body>
-  <script src="../xetex.js"></script>
-  <script>
-    var xetex = new xetex.XeTeX('../xetex.worker.js', function (e) {
-      var response = e.data;
-      switch (response.channel) {
-        case 'stdout':
-          console.log(response.data);
-          break;
-
-        case 'stderr':
-          console.warn(response.data);
-          break;
-
-        default:
-          console.error('Unknown channel: ' + response.channel);
-      }
-    });
-    xetex.postMessage({namespace: 'Module', 'command': 'run', arguments: []});
-  </script>
 </html>

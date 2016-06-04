@@ -262,5 +262,6 @@ $(XETEX_BC): xetex-toplevel.stamp $(NATIVE_TOOLS)
 xetex.bc: $(XETEX_BC)
 	cp $< $@
 
-xetex.worker.js: xetex.bc xetex.pre.worker.js xetex.post.worker.js
-	emcc -O2 xetex.bc --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@
+xetex.worker.js: xetex.bc xetex.pre.worker.js
+#	emcc -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -o $@
+	emcc -g -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -o $@
