@@ -3,8 +3,10 @@ if (typeof Module === 'undefined') {
   Module = {};
 }
 
+Module.thisProgram = './xelatex';
+
 Module.preInit = function () {
-  FS.createDataFile('/', Module['thisProgram'], 'dummy for kpathsea', true, true);
+  FS.createDataFile('/', Module.thisProgram, 'Dummy file for kpathsea', true, true);
 };
 
 Module.print = function (data) {
