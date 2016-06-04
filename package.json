@@ -1,0 +1,31 @@
+{
+  "name": "xetex",
+  "version": "0.0.0",
+  "description": "XeTeX",
+  "author": "David Xu",
+  "keywords": [
+    "xetex",
+    "tex",
+    "pdf"
+  ],
+  "homepage": "https://www.github.come/lyze/xetex-js",
+  "license": "MIT",
+  "main": "xetex.umd.js",
+  "browser": "xetex.umd.js",
+  "jsnext:main": "xetex.js",
+  "repository": {
+    "type": "git",
+    "url": "https://www.github.com/lyze/xetex-js.git"
+  },
+  "scripts": {
+    "start": "npm run-script dist && http-server .",
+    "dist": "rollup xetex.js -n xetex -f umd -o xetex.umd.js",
+    "prepublish": "npm run-script dist && uglifyjs xetex.umd.js -c -m -o xetex.umd.min.js"
+  },
+  "devDependencies": {
+    "http-server": "^0.9.0",
+    "rollup": "^0.26.3",
+    "uglifyjs": "^2.4.10"
+  },
+  "private": true
+}

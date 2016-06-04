@@ -113,14 +113,15 @@ endif
 
 
 .PHONY: all
-all: xetex.js
+all: xetex.worker.js
 
 .PHONY: clean-js
 clean-js:
 	rm -rf $(EXPAT_SOURCE_DIR) $(EXPAT_BUILD_DIR)
 	rm -rf $(FONTCONFIG_SOURCE_DIR) $(EXPAT_BUILD_DIR)
 	rm -rf xetex-configured.stamp xetex-toplevel.stamp $(JS_DIR)
-	rm $(VERBOSE_LOG)
+	rm -f xetex.bc xetex.worker.js xetex.worker.js.mem
+	rm -f $(VERBOSE_LOG)
 
 .PHONY: clean
 clean: clean-js
@@ -258,6 +259,8 @@ $(XETEX_BC): xetex-toplevel.stamp $(NATIVE_TOOLS)
 	fi
 	EMCONFIGURE_JS=2 emmake $(MAKE) -C $(JS_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG)
 
-xetex.js: $(XETEX_BC)
-	cp $< xetex.bc
-	emcc -O2 xetex.bc -o $@
+xetex.bc: $(XETEX_BC)
+	cp $< $@
+
+xetex.worker.js: xetex.bc xetex.pre.worker.js xetex.post.worker.js
+	emcc -O2 xetex.bc --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@

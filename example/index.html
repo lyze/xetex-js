@@ -1,0 +1,25 @@
+<html>
+  <body>
+    <label for="source-textarea">Source</label>
+    <textarea id="source-textarea"></textarea>
+  </body>
+  <script src="../xetex.js"></script>
+  <script>
+    var xetex = new xetex.XeTeX('../xetex.worker.js', function (e) {
+      var response = e.data;
+      switch (response.channel) {
+        case 'stdout':
+          console.log(response.data);
+          break;
+
+        case 'stderr':
+          console.warn(response.data);
+          break;
+
+        default:
+          console.error('Unknown channel: ' + response.channel);
+      }
+    });
+    xetex.postMessage({namespace: 'Module', 'command': 'run', arguments: []});
+  </script>
+</html>
