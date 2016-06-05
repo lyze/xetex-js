@@ -13,10 +13,12 @@ that it is not actually necessary to build XeTeX, but the end program would
 otherwise be unable to actually compile your garden-variety LaTeX documents.
 
 
-## Building
+## Building from scratch
+
+Note that building from scratch and running the example are orthogonal concerns,
+since the generated artifacts are checked in.
 
 1.  [Install Emscripten.](https://kripken.github.io/emscripten-site/)
-
 2.  Run `make`.
 
 Artifacts:
@@ -32,8 +34,8 @@ Artifacts:
          `xetex.worker.js`. This file contains glue to call the
          [Module](https://kripken.github.io/emscripten-site/docs/api_reference/module.html)
          and
-         [FS API](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html)
-         from `xetex.js`
+         [FS API](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html)s
+         from `xetex.js`.
 *   `xetex/xelatex.fmt` a TeX memory dump that needs to be available in order to
     compile garden variety LaTeX documents.
 *   `texlive.lst` a manifest file that lists all of the usable files in the TeX
@@ -43,13 +45,19 @@ Artifacts:
 
 ## Running the example
 
-Do `npm start` and visit `example/index.html`.
+1.  `make texlive.lst`
+2.   `npm start`
+3.   ???
+4.   Visit `example/index.html`.
 
 
 ## Porting notes
 
 The build follows the Emscripten recommendation to build the project to both
-native and JavaScript targets.
+native and JavaScript targets. Executables are generated to be used by later
+steps in the build. Since, the generated JavaScript code cannot be run directly,
+the required executables are copied from the native build and then the build is
+continued.
 
 
 ## Hints
@@ -57,10 +65,7 @@ native and JavaScript targets.
 One major bottleneck is the creation of a `xelatex.fmt` memory dump, which
 downloads the full TeX Live distribution. If you have a full TeX Live
 distribution on your computer, you can set `USE_SYSTEM_TL=1` when you invoke
-make.
-
-You might be able to just use an already created `xelatex.fmt` dump file, but I
-have not really tried this.
+`make`. This part can most likely be improved.
 
 
 # License

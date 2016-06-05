@@ -331,7 +331,7 @@ $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR)
 
 else
 
-$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive/texlive-installed.stamp
+$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive-full.stamp
 	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) unpack.ins
 	TEXMF=texlive/texmf-dist//: TEXMFCNF=texlive/:texlive/texmf-dist/web2c/ TEXINPUTS=$(LATEX_BASE_SOURCE_DIR):texlive/texmf-dist/web2c//: $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) latex.ltx
 
@@ -348,12 +348,31 @@ $(INSTALL_TL_UNX_ARCHIVE):
 # later consulted via XHR in the example to load the texlive tree for kpathsea.
 # This part can be easily customized to your liking.
 .DELETE_ON_ERROR: texlive.lst
-texlive.lst: texlive/texlive-installed.stamp
+texlive.lst: texlive-basic.stamp
 	find texlive -type d -exec echo -e {}/ \; > $@
 	find texlive -type f -exec echo {} \; >> $@
 
-.SECONDARY: texlive/texlive-installed.stamp
-texlive/texlive-installed.stamp: $(INSTALL_TL_UNX_ARCHIVE)
+.SECONDARY: texlive-basic.stamp
+texlive-basic.stamp: $(INSTALL_TL_UNX_ARCHIVE)
+	mkdir -p texlive/
+# prepare a profile to install texlive
+	echo selected_scheme scheme-basic > texlive/profile.input
+	echo TEXDIR `pwd`/texlive >> texlive/profile.input
+	echo TEXMFLOCAL `pwd`/texlive/texmf-local >> texlive/profile.input
+	echo TEXMFSYSVAR `pwd`/texlive/texmf-var >> texlive/profile.input
+	echo TEXMFSYSCONFIG `pwd`/texlive/texmf-config >> texlive/profile.input
+	echo TEXMFVAR `pwd`/texlive/texmf-var >> texlive/profile.input
+# Now install texlive locally. This is a kludge that will break if there are
+# multiple install-tl-XXXFDATEXXX directories that were previously extracted.
+	tar xf $(INSTALL_TL_UNX_ARCHIVE)
+	install-tl-*/install-tl -profile texlive/profile.input
+# Clean out unneeded files
+	rm -rf texlive/bin/ texlive/tlpkg/ texlive/texmf-dist/doc/ texlive/texmf-var/doc/ texlive/readme-html.dir/ texlive/readme-txt.dir/ texlive/index.html texlive/doc.html texlive/install-tl.log
+	find texlive/ -executable -type f -exec rm {} +
+	touch $@
+
+.SECONDARY: texlive-full.stamp
+texlive-full.stamp: $(INSTALL_TL_UNX_ARCHIVE)
 	mkdir -p texlive/
 # prepare a profile to install texlive
 	echo selected_scheme scheme-full > texlive/profile.input
@@ -362,10 +381,11 @@ texlive/texlive-installed.stamp: $(INSTALL_TL_UNX_ARCHIVE)
 	echo TEXMFSYSVAR `pwd`/texlive/texmf-var >> texlive/profile.input
 	echo TEXMFSYSCONFIG `pwd`/texlive/texmf-config >> texlive/profile.input
 	echo TEXMFVAR `pwd`/texlive/texmf-var >> texlive/profile.input
-# Now install texlive. This is a kludge that will break if there are multiple
-# install-tl-XXXFDATEXXX directories that were previously extracted.
+# Now install texlive locally. This is a kludge that will break if there are
+# multiple install-tl-XXXFDATEXXX directories that were previously extracted.
 	tar xf $(INSTALL_TL_UNX_ARCHIVE)
 	install-tl-*/install-tl -profile texlive/profile.input
-# Clean out executable files
+# Clean out unneeded files
+	rm -rf texlive/bin/ texlive/tlpkg/ texlive/texmf-dist/doc/ texlive/texmf-var/doc/ texlive/readme-html.dir/ texlive/readme-txt.dir/ texlive/index.html texlive/doc.html texlive/install-tl.log
 	find texlive/ -executable -type f -exec rm {} +
 	touch $@
