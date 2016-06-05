@@ -1,5 +1,9 @@
 /* global MessageChannel, Worker */
 /**
+ * @license Copyright David Xu, 2016
+ */
+
+/**
  * Controller for a worker that will run a xetex process.
  */
 export class XeTeX {

@@ -2,6 +2,9 @@
 MAKEFLAGS += --no-builtin-rules # --warn-undefined-variables
 .SUFFIXES:
 
+# Uncomment to use the system installation of TeX Live to build xelatex.fmt.
+# USE_SYSTEM_TL = 1
+
 VERBOSE_LOG = make.log
 $(info Standard output from configure and recursive make calls will be sent to $(VERBOSE_LOG).)
 
@@ -24,6 +27,13 @@ EXPAT_ARCHIVE = expat-2.1.1.tar.bz2
 EXPAT_SOURCE_DIR = expat-2.1.1/
 EXPAT_BUILD_DIR = build-expat/
 EXPAT_ARCHIVE_URL = 'http://downloads.sourceforge.net/project/expat/expat/2.1.1/expat-2.1.1.tar.bz2?r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fexpat%2F%3Fsource%3Dtyp_redirect&ts=1464668346&use_mirror=tenet'
+
+LATEX_BASE_ARCHIVE = base.zip
+LATEX_BASE_SOURCE_DIR = base/
+LATEX_BASE_ARCHIVE_URL = http://mirrors.ctan.org/macros/latex/base.zip
+
+INSTALL_TL_UNX_ARCHIVE = install-tl-unx.tar.gz
+INSTALL_TL_UNX_ARCHIVE_URL = http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
 
 # Contains native web2c tools used to later compile into JavaScript
 NATIVE_DIR = build-native/
@@ -113,10 +123,32 @@ endif
 
 
 .PHONY: all
-all: xetex.worker.js
+all: xetex.worker.js xetex/xelatex.fmt texlive.lst
+
+.PHONY: texlive-manifest
+texlive-manifest: texlive.lst
+
+.PHONY: confirm-clean
+confirm-clean:
+	@while :; do							\
+		read -p 'Really clean (yes/no)? ' choice;		\
+		case "$$choice" in					\
+	  		yes|ye|y|YES|YE|Y) exit;;			\
+	  		n|N|no|NO) exit -1;;				\
+	  		* ) echo -n 'Please enter either yes or no. ';;	\
+		esac;							\
+	done
+	@while :; do							\
+		read -p 'Are you absolutely sure (yes/no)? ' choice;	\
+		case "$$choice" in					\
+	  		yes|ye|y|YES|YE|Y) exit;;			\
+	  		n|N|no|NO) exit -1;;				\
+	  		* ) echo -n 'Please enter either yes or no. ';;	\
+		esac;							\
+	done
 
 .PHONY: clean-js
-clean-js:
+clean-js: confirm-clean
 	rm -rf $(EXPAT_SOURCE_DIR) $(EXPAT_BUILD_DIR)
 	rm -rf $(FONTCONFIG_SOURCE_DIR) $(EXPAT_BUILD_DIR)
 	rm -rf xetex-configured.stamp xetex-toplevel.stamp $(JS_DIR)
@@ -125,10 +157,15 @@ clean-js:
 
 .PHONY: clean
 clean: clean-js
+	rm -rf $(LATEX_BASE_SOURCE_DIR)
+	rm -rf texlive/ install-tl*
+	rm -rf xetex/
 	rm -rf native.stamp $(NATIVE_DIR) $(XETEX_SOURCE_DIR)
 
 .PHONY: distclean
 distclean: clean
+	rm -f $(LATEX_BASE_ARCHIVE)
+	rm -f $(INSTALL_TL_UNX_ARCHIVE)
 	rm -f $(EXPAT_ARCHIVE) $(FONTCONFIG_ARCHIVE)
 	rm -f $(XETEX_ARCHIVE)
 
@@ -191,6 +228,7 @@ NATIVE_WEB2C_WEB2C = $(addprefix $(NATIVE_DIR)texk/web2c/web2c/, fixwrites makec
 NATIVE_WEB2C_TOOLS = $(NATIVE_WEB2C) $(NATIVE_WEB2C_WEB2C)
 NATIVE_ICU_TOOLS = $(addprefix $(NATIVE_DIR)libs/icu/icu-build/bin/, icupkg pkgdata)
 NATIVE_TOOLS = $(NATIVE_WEB2C_TOOLS) $(NATIVE_DIR)libs/freetype2/ft-build/apinames
+NATIVE_XETEX = $(NATIVE_DIR)texk/web2c/xetex
 
 $(NATIVE_TOOLS): native.stamp
 
@@ -207,6 +245,9 @@ native.stamp: $(NATIVE_DIR)
 	$(MAKE) -C $(NATIVE_DIR)libs/icu/ >> $(VERBOSE_LOG)
 	$(MAKE) -C $(NATIVE_DIR)libs/icu/icu-build/ >> $(VERBOSE_LOG)
 	touch $@
+
+$(NATIVE_XETEX): $(NATIVE_DIR)
+	$(MAKE) -C $(NATIVE_DIR)texk/web2c/ xetex >> $(VERBOSE_LOG)
 
 $(LIB_FREETYPE): xetex-configured.stamp
 	echo '>>>' Building xetex libraries...
@@ -264,3 +305,67 @@ xetex.bc: $(XETEX_BC)
 xetex.worker.js: xetex.bc xetex.pre.worker.js
 #	emcc -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -o $@
 	emcc -g -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -o $@
+
+###############################################################################
+# xelatex.fmt
+###############################################################################
+$(LATEX_BASE_ARCHIVE):
+	curl -L $(LATEX_BASE_ARCHIVE_URL) -o $@
+
+$(LATEX_BASE_SOURCE_DIR): $(LATEX_BASE_ARCHIVE)
+	unzip -o $<
+	test -d $@ && touch $@
+
+# Remember that we need to set argv[0] to xelatex when we invoke xetex.
+xetex/xelatex.fmt: $(LATEX_BASE_SOURCE_DIR)latex.fmt
+	mkdir -p xetex/
+	cp $< $@
+
+ifdef USE_SYSTEM_TL
+
+$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR)
+	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR) xetex -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) unpack.ins
+# The expansion of TEXINPUTS will have two trailing slashes and a colon, which
+# is significant, but doesn't matter in this case.
+	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR)/: xetex -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) latex.ltx
+
+else
+
+$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive/texlive-installed.stamp
+	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) unpack.ins
+	TEXMF=texlive/texmf-dist//: TEXMFCNF=texlive/:texlive/texmf-dist/web2c/ TEXINPUTS=$(LATEX_BASE_SOURCE_DIR):texlive/texmf-dist/web2c//: $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) latex.ltx
+
+endif # USE_SYSTEM_TL
+
+
+###############################################################################
+# TeX Live
+###############################################################################
+$(INSTALL_TL_UNX_ARCHIVE):
+	curl -L $(INSTALL_TL_UNX_ARCHIVE_URL) -o $@
+
+# Create a manifest file for the texlive distribution. This manifest file is
+# later consulted via XHR in the example to load the texlive tree for kpathsea.
+# This part can be easily customized to your liking.
+.DELETE_ON_ERROR: texlive.lst
+texlive.lst: texlive/texlive-installed.stamp
+	find texlive -type d -exec echo -e {}/ \; > $@
+	find texlive -type f -exec echo {} \; >> $@
+
+.SECONDARY: texlive/texlive-installed.stamp
+texlive/texlive-installed.stamp: $(INSTALL_TL_UNX_ARCHIVE)
+	mkdir -p texlive/
+# prepare a profile to install texlive
+	echo selected_scheme scheme-full > texlive/profile.input
+	echo TEXDIR `pwd`/texlive >> texlive/profile.input
+	echo TEXMFLOCAL `pwd`/texlive/texmf-local >> texlive/profile.input
+	echo TEXMFSYSVAR `pwd`/texlive/texmf-var >> texlive/profile.input
+	echo TEXMFSYSCONFIG `pwd`/texlive/texmf-config >> texlive/profile.input
+	echo TEXMFVAR `pwd`/texlive/texmf-var >> texlive/profile.input
+# Now install texlive. This is a kludge that will break if there are multiple
+# install-tl-XXXFDATEXXX directories that were previously extracted.
+	tar xf $(INSTALL_TL_UNX_ARCHIVE)
+	install-tl-*/install-tl -profile texlive/profile.input
+# Clean out executable files
+	find texlive/ -executable -type f -exec rm {} +
+	touch $@

@@ -1,4 +1,7 @@
 /* global FS, Module */
+/**
+ * @license Copyright David Xu, 2016
+ */
 if (typeof Module === 'undefined') {
   Module = {};
 }
