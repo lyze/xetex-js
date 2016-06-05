@@ -18,6 +18,8 @@ otherwise be unable to actually compile your garden-variety LaTeX documents.
 Note that building from scratch and running the example are orthogonal concerns,
 since the generated artifacts are checked in.
 
+An internet connection is required.
+
 1.  [Install Emscripten.](https://kripken.github.io/emscripten-site/)
 2.  Run `make`.
 
@@ -39,16 +41,19 @@ Artifacts:
 *   `xetex/xelatex.fmt` a TeX memory dump that needs to be available in order to
     compile garden variety LaTeX documents.
 *   `texlive.lst` a manifest file that lists all of the usable files in the TeX
-    Live distribution. The example uses this manifest file to create a virtual
-    filesystem environment that is necessary to compile LaTeX documents.
+    Live (basic) distribution. The example uses this manifest file to create a
+    virtual filesystem environment that is necessary to compile LaTeX documents.
 
 
 ## Running the example
 
+The example uses the TeX Live basic distribution. An internet connection is
+required to download it.
+
+0.  `npm install`
 1.  `make texlive.lst`
 2.   `npm start`
-3.   ???
-4.   Visit `example/index.html`.
+3.   Visit `example/index.html`.
 
 
 ## Porting notes
@@ -66,6 +71,7 @@ One major bottleneck is the creation of a `xelatex.fmt` memory dump, which
 downloads the full TeX Live distribution. If you have a full TeX Live
 distribution on your computer, you can set `USE_SYSTEM_TL=1` when you invoke
 `make`. This part can most likely be improved.
+
 
 
 # License

@@ -2,7 +2,7 @@
  * @license Copyright David Xu, 2016
  */
 var Module; if (!Module) Module = (typeof Module !== 'undefined' ? Module : null) || {};
-
+// TODO: hack in multiple calls to Module.callMain
 // Use an IIFE to protect our internal state.
 (function (Module) {
   /* global FS */
@@ -27,6 +27,14 @@ var Module; if (!Module) Module = (typeof Module !== 'undefined' ? Module : null
       return;
     }
     var replyPort = event.ports[0];
+    if (msg.error && msg.error instanceof FS.ErrnoError) {
+      msg.error = {
+        code: msg.error.code,
+        errno: msg.error.errno,
+        message: msg.error.message,
+        stack: msg.error.stack
+      };
+    }
     try {
       replyPort.postMessage(msg);
     } catch (e) {
