@@ -1,4 +1,22 @@
 # Copyright David Xu, 2016
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy,
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 MAKEFLAGS += --no-builtin-rules # --warn-undefined-variables
 .SUFFIXES:
 
@@ -53,6 +71,7 @@ LIB_FONTCONFIG = $(FONTCONFIG_BUILD_DIR)src/.libs/libfontconfig.so
 # libs/freetype2 first before building the rest of the tree. We also explicitly
 # hack in the dependency on libexpat.
 #
+# FIXME: These flags don't seem to disable multithreading.
 # Pass --disable-threads to propagate down to the ICU library.
 # Pass --disable-multithreaded to propagate down the poppler library.
 XETEX_CONF =										\
@@ -302,9 +321,10 @@ $(XETEX_BC): xetex-toplevel.stamp $(NATIVE_TOOLS)
 xetex.bc: $(XETEX_BC)
 	cp $< $@
 
-xetex.worker.js: xetex.bc xetex.pre.worker.js
-#	emcc -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -o $@
-	emcc -g -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -o $@
+xetex.worker.js: xetex.bc xetex.pre.worker.js xetex.post.worker.js
+#	emcc -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -s TOTAL_MEMORY=268435456 -o $@
+#	emcc -g -O2 xetex.bc --pre-js xetex.pre.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=268435456 -o $@
+	emcc -g -O2 xetex.bc --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=268435456 -o $@
 
 ###############################################################################
 # xelatex.fmt

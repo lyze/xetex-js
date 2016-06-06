@@ -20,11 +20,14 @@
   "scripts": {
     "rollup": "rollup xetex.js -n xetex -f umd -m xetex.umd.js.map -o xetex.umd.js",
     "dist": "npm run-script rollup && uglifyjs xetex.umd.js -c -m --in-source-map xetex.umd.js.map --source-map xetex.umd.min.js.map -o xetex.umd.min.js",
-
     "start": "npm run-script rollup && http-server .",
+    "lint": "eslint xetex.js example/index.html",
     "prepublish": "npm run-script dist"
   },
   "devDependencies": {
+    "eslint": "^2.11.1",
+    "eslint-config-google": "^0.5.0",
+    "eslint-plugin-html": "^1.5.1",
     "http-server": "^0.9.0",
     "rollup": "^0.26.3",
     "uglifyjs": "^2.4.10"

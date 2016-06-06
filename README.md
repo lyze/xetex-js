@@ -56,7 +56,22 @@ required to download it.
 3.   Visit `example/index.html`.
 
 
-## Porting notes
+## Known limitations
+
+It is not feasible to execute the main function multiple times because there are
+memory leaks. The easiest (and best) way to run the program multiple times with
+a clean state is to create a new instance every time.
+
+Emscripten does not have a pluggable filesystem at this time
+(kripken/emscripten#777).
+
+If you use
+[Emscripten's `MEMFS`](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html#memfs)
+and you need to run the program multiple times, you will have to reconstruct the
+filesystem for each new instance.
+
+
+## Port notes
 
 The build follows the Emscripten recommendation to build the project to both
 native and JavaScript targets. Executables are generated to be used by later

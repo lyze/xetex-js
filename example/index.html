@@ -2,9 +2,98 @@
   <head>
     <script src="../xetex.umd.js"></script>
     <script>
-      var xetex = new xetex.XeTeX('../xetex.worker.js', function (e) {
+      /* global xetex */
+      // Setup virtual filesystem. We need to call this function every time the
+      // xetex image reloads, since the filesystem defaults to an in-memory
+      // filesystem with no persistence.
+      var prepareVirtualFS = function(controller) {
+        console.log('Setting up virtual in-memory filesystem environment...');
+        controller.sendMessage({
+          namespace: 'FS', command: 'createLazyFile',
+          arguments: ['/', 'xelatex.fmt', '../xetex/xelatex.fmt', true, false],
+          ret: null
+        });
+        // we will mount TeX Live under texlive-basic/
+        controller.sendMessage({
+          namespace: 'FS', command: 'createDataFile',
+          // TODO can't find texlive stuff
+          arguments: [
+            '/', 'texmf.cnf',
+            'TEXMF = /texlive-basic/texmf-dist//\n' +
+            'TEXMFROOT = /texlive-basic\n' +
+            'TEXFORMATS = .;/\nTEXINPUTS = .',
+            true, false],
+          ret: null
+        });
+
+        var texLiveLoaded = new Promise(function(resolve, reject) {
+          var prepareTeXLiveFromManifest = function(response) {
+            // Each line is a relative path. Directories listed first, then files.
+            var lines = response.split('\n');
+            var commands = [];
+            var numDirectories = 0;
+            var numFiles = 0;
+            lines.forEach(function(path) {
+              var lastSlash = path.lastIndexOf('/');
+              if (lastSlash === path.length - 1) { // trailing slash?
+                // create directory
+                commands.push(controller.sendMessage({
+                  namespace: 'FS', command: 'createPath',
+                  arguments: ['/', path, true, true],
+                  ret: null
+                }).then(function() {
+                  numDirectories++;
+                }, reject));
+              } else {
+                // Directory already created.
+                var dirname = path.slice(0, lastSlash);
+                var filename = path.slice(lastSlash + 1);
+                commands.push(controller.sendMessage({
+                  namespace: 'FS', command: 'createLazyFile',
+                  arguments: ['/' + dirname, filename, '../' + path, true, false],
+                  ret: null
+                }).then(function() {
+                  numFiles++;
+                }, reject));
+              }
+            });
+            resolve(Promise.all(commands).then(function() {
+              return {numDirectories: numDirectories, numFiles: numFiles};
+            }));
+          };
+
+          var manifestXhr = new XMLHttpRequest();
+          manifestXhr.open('GET', '../texlive.lst');
+          manifestXhr.onreadystatechange = function() {
+            if (this.readyState === XMLHttpRequest.DONE) {
+              if (this.status === 200) {
+                prepareTeXLiveFromManifest(this.response);
+              } else {
+                console.error('XHR for manifest file returned a non-200 status code.',
+                              this);
+                reject();
+              }
+            }
+          };
+          manifestXhr.send();
+        });
+
+        texLiveLoaded.then(function(stats) {
+          console.log('TeX Live creation stats', stats);
+          console.log('Created in-memory virtual filesystem environment.');
+        }, function(e) {
+          console.error(e);
+        });
+      };
+
+      var controller = new xetex.XeTeX('../xetex.worker.js', function(e) {
         var response = e.data;
         switch (response.channel) {
+          case 'ready':
+            console.log('Ready.');
+            prepareVirtualFS(controller);
+            break;
+
           case 'stdout':
             console.log(response.data);
             break;
@@ -18,105 +107,29 @@
         }
       });
 
-      // setup virtual filesystem
-      console.log('Setting up virtual filesystem environment...');
-      xetex.sendMessage({
-        namespace: 'FS', command: 'createLazyFile',
-        arguments: ['/', 'xelatex.fmt', '../xetex/xelatex.fmt', true, false],
-        ret: null
-      });
-      // we will mount TeX Live under texlive-basic/
-      xetex.sendMessage({
-        namespace: 'FS', command: 'createDataFile',
-        // TODO can't find texlive stuff
-        arguments: ['/', 'texmf.cnf', 'TEXMF = /texlive-basic/texmf-dist/\nTEXMFROOT = /texlive-basic\nTEXFORMATS = .;/\nTEXINPUTS = .', true, false],
-        ret: null
-      });
-
-      var texLiveLoaded = new Promise(function (resolve, reject) {
-        var prepareTeXLiveFromManifest = function (response) {
-          // Each line is a relative path. Directories listed first, then files.
-          var lines = response.split('\n');
-          var commands = [];
-          var numDirectories = 0;
-          var numFiles = 0;
-          lines.forEach(function (path) {
-            var lastSlash = path.lastIndexOf('/');
-            if (lastSlash === path.length - 1) { // trailing slash?
-              // create directory
-              commands.push(xetex.sendMessage({
-                namespace: 'FS', command: 'createPath',
-                arguments: ['/', path, true, true],
-                ret: null
-              }).then(function () {
-                numDirectories++;
-              }, reject));
-            } else {
-              // Directory already created.
-              var dirname = path.slice(0, lastSlash);
-              var filename = path.slice(lastSlash + 1);
-              commands.push(xetex.sendMessage({
-                namespace: 'FS', command: 'createLazyFile',
-                arguments: ['/' + dirname, filename, '../' + path, true, false],
-                ret: null
-              }).then(function () {
-                numFiles++;
-              }, reject));
-            }
-          });
-          resolve(Promise.all(commands).then(function () {
-            return {numDirectories: numDirectories, numFiles: numFiles};
-          }));
-        };
-
-        var manifestXhr = new XMLHttpRequest();
-        manifestXhr.open('GET', '../texlive.lst');
-        manifestXhr.onreadystatechange = function () {
-          if (this.readyState === XMLHttpRequest.DONE) {
-            if (this.status === 200) {
-              prepareTeXLiveFromManifest(this.response);
-            } else {
-              console.error('XHR for manifest file returned a non-200 status code.',
-                            this);
-              reject();
-            }
-          }
-        };
-        manifestXhr.send();
-      });
-
-      texLiveLoaded.then(function (stats) {
-        console.log('TeX Live creation stats', stats);
-        console.log('Created virtual filesystem environment.');
-      }, function (e) {
-        console.error(e);
-      });
-
-      document.addEventListener('DOMContentLoaded', function () {
+      document.addEventListener('DOMContentLoaded', function() {
         var form = document.getElementById('form');
         var sourceTextArea = document.getElementById('source');
-        form.addEventListener('submit', function () {
-          event.preventDefault();
-          texLiveLoaded.then(function (ignored2) {
-            xetex.sendMessage({
-              namespace: 'FS', command: 'createDataFile',
-              arguments: ['/', 'source.tex', sourceTextArea.value, true, true],
-              // Since the result of createDataFile can't be cloned (and thus
-              // cannot be passed back from the worker), make this our return value
-              ret: null
-            }).then(function (result) {
-              console.log('source textarea: FS.createDataFile', result);
-            }, function (error) {
-              console.log('source textarea: FS.createDataFile', error);
-            });
-            xetex.sendMessage({
-              namespace: 'Module', command: 'callMain',
-              arguments: [['-interaction=nonstopmode', './source.tex']]
-            }).then(function (result) {
-              console.log('compile: Module.callMain', result);
-            }, function (error) {
-              console.error('compile: Module.callMain', error);
-            });
+        form.addEventListener('submit', function(e) {
+          e.preventDefault();
+          controller.sendMessage({
+            namespace: 'FS', command: 'createDataFile',
+            arguments: ['/', 'source.tex', sourceTextArea.value, true, true],
+            // Since the result of createDataFile can't be cloned (and thus
+            // cannot be passed back from the worker), make this our return value
+            ret: null
+          }).then(function(result) {
+            console.log('source textarea: FS.createDataFile', result);
+          }, function(error) {
+            console.log('source textarea: FS.createDataFile', error);
+          });
+          controller.sendMessage({
+            namespace: 'Module', command: 'callMain',
+            arguments: [['-interaction=nonstopmode', './source.tex']]
+          }).then(function(result) {
+            console.log('compile: Module.callMain', result);
+          }, function(error) {
+            console.error('compile: Module.callMain', error);
           });
         });
       });
