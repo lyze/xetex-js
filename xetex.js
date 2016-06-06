@@ -6,20 +6,15 @@
 /**
  * Controller for a worker that will run a xetex process.
  *
- * The xetex worker automatically reloads its image when it exits. The worker
- * sends a message back to the controller when the code module is reloaded,
- * including the first time that it is loaded. The worker also communicates
- * {@code stdout} and {@code stdin}.
+ * The xetex worker does not automatically load the program. Manually trigger
+ * loading by calling {@link #reload}. The xetex worker does not automatically
+ * reload its image when it exits.
+ *
+ * The worker also communicates {@code stdout} and {@code stdin}.
  *
  * @example
  * var controller = new XeTeX('xetex.worker.js', response => {
  *   switch (response.channel) {
- *     case 'ready':
- *       console.log('Ready.')
- *       console.log(`worker image reloaded at ${event.time}`);
- *       prepareVirtualFS(controller);
- *       break;
- *
  *     case 'stdout':
  *       console.log(response.data);
  *       break;
@@ -34,7 +29,8 @@
  */
 export class XeTeX {
   /**
-   * Creates a controller for a worker that will run a xetex process.
+   * Creates a controller for a worker that will run a xetex process. The worker
+   * immediately begins the initialization process.
    *
    * @constructor
    * @param {string} workerPath the URL of the xetex worker
@@ -48,28 +44,39 @@ export class XeTeX {
   }
 
   /**
-   * Delegates to {@code Worker.postMessage}.
+   * Reloads the worker image.
    *
-   * @param {...*} args the arguments to pass to {@code Worker.postMessage}
+   * @return {Promise} a promise that resolves to a {@link Date} object
+   * describing when the runtime was initialized
    */
-  postMessage(...args) {
-    this.worker.postMessage(...args);
+  reload() {
+    return this.sendMessage('reload');
   }
 
   /**
    * Sends the specified message to the worker.
    *
    * @example
+   * // Causes the worker to reload the program image.
+   * controller.sendMessage('reload');
+   * @example
    * controller.sendMessage({
    *   namespace: 'Module', command: 'callMain',
    *   arguments: [['-interaction=nonstopmode', './source.tex']]
    * })
    * @example
-   * // Specify a success value if ordinarily the return value is not structured cloneable.
+   * // Specify a success value if ordinarily the return value is not structured
+   * // cloneable. Otherwise, you'll get a warning.
    * controller.sendMessage({
    *   namespace: 'FS', command: 'createLazyFile',
    *   arguments: ['/', 'xelatex.fmt', 'xetex/xelatex.fmt', true, false],
    *   ret: null,
+   * });
+   * @example
+   * // Special case for FS.mount
+   * controller.sendMessage({
+   *   namespace: 'FS', command: 'mount',
+   *   arguments: ['IDBFS', {}, '/will-be-persisted-after-calling-FS.syncfs']
    * });
    * @param {Object} message the message to send
    * @return {Promise} a promise that is resolved when the requested worker
@@ -87,5 +94,14 @@ export class XeTeX {
       };
       this.postMessage(message, [messageChannel.port2]);
     });
+  }
+
+  /**
+   * Delegates to {@code Worker.postMessage}.
+   *
+   * @param {...*} args the arguments to pass to {@code Worker.postMessage}
+   */
+  postMessage(...args) {
+    this.worker.postMessage(...args);
   }
 }

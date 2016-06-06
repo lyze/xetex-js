@@ -28,12 +28,6 @@ var Module = {
   },
   printErr: function(data) {
     self.postMessage({channel: 'stderr', data: data});
-  },
-  onRuntimeInitialized: function () {
-    self.postMessage({
-      channel: 'ready',
-      time: new Date()
-    });
   }
 };
 

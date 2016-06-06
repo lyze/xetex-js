@@ -29,13 +29,25 @@
 var FS;
 
 var updateToNewModule = function() {
+  if (Module.HEAPU8) {
+    Module.HEAPU8.fill(0);  // avoids choking when assertions are enabled.
+    Module.calledRun = false; // hack
+  }
   var m = xetexCore(Module);
+  // update globals
   Module = m[0];
   FS = m[1];
 };
 
-// Set the globals on a first run.
-updateToNewModule();
+
+var runtimeInitializedCallbacks = [];
+
+Module.onRuntimeInitialized = function () {
+  runtimeInitializedCallbacks.forEach(function (callback) {
+    callback();
+  });
+  runtimeInitializedCallbacks = [];
+};
 
 var replyThroughPort = function(event, msg, altMsg) {
   if (event.ports.length === 0) {
@@ -92,7 +104,18 @@ var executeAsync = function(event, asyncHandler, message) {
   });
 };
 
-var asyncCallMain = function(data) {
+var handleReloadAsync = function () {
+  return new Promise(function (resolve) {
+    if (runtimeInitializedCallbacks.length === 0) {
+      updateToNewModule();
+    }
+    runtimeInitializedCallbacks.push(function () {
+      resolve(new Date());
+    });
+  });
+};
+
+var callMainAsync = function(data) {
   return new Promise(function(resolve, reject) {
     Module.onExit = function(status) {
       if (status === 0) {
@@ -103,12 +126,6 @@ var asyncCallMain = function(data) {
           status: status
         });
       }
-      // Recreate the module.
-      setTimeout(function() {
-        Module.HEAPU8.fill(0);  // avoids choking when assertions are enabled.
-        Module.calledRun = false; // hack
-        updateToNewModule();
-      }, 0);
     };
     Module.callMain.apply(Module, data.arguments);
   });
@@ -141,9 +158,16 @@ var handleFSMessage = function(data) {
 
 self.onmessage = function(e) {
   var data = e.data;
+  // Kludge to reload the module
+  if (e.data === 'reload') {
+    // Recreate the module.
+    executeAsync(e, handleReloadAsync, data);
+    return;
+  }
+
   // Kludge to get an exit status
   if (data.namespace === 'Module' && data.command === 'callMain') {
-    executeAsync(e, asyncCallMain, data);
+    executeAsync(e, callMainAsync, data);
     return;
   }
   var handler;

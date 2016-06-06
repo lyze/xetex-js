@@ -322,9 +322,8 @@ xetex.bc: $(XETEX_BC)
 	cp $< $@
 
 xetex.worker.js: xetex.bc xetex.pre.worker.js xetex.post.worker.js
-#	emcc -O2 xetex.bc --pre-js xetex.pre.worker.js -s INVOKE_RUN=0 -s TOTAL_MEMORY=268435456 -o $@
-#	emcc -g -O2 xetex.bc --pre-js xetex.pre.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=268435456 -o $@
-	emcc -g -O2 xetex.bc --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=268435456 -o $@
+#	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
+	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
 
 ###############################################################################
 # xelatex.fmt
