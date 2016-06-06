@@ -62,8 +62,7 @@ It is not feasible to execute the main function multiple times because there are
 memory leaks. The easiest (and best) way to run the program multiple times with
 a clean state is to create a new instance every time.
 
-Emscripten does not have a pluggable filesystem at this time
-(kripken/emscripten#777).
+[Emscripten does not have a pluggable filesystem at this time.](https://github.com/kripken/emscripten/issues/777)
 
 If you use
 [Emscripten's `MEMFS`](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html#memfs)
