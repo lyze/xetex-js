@@ -31,13 +31,13 @@ Artifacts:
 *   `xetex.worker.js` the compiled JavaScript file that ought to be loaded into
     a
     [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API).
-    *   `xetex.pre.worker.js` a file whose contents is added before the
-         generated JavaScript, and appears at the beginning of
-         `xetex.worker.js`. This file contains glue to call the
-         [Module](https://kripken.github.io/emscripten-site/docs/api_reference/module.html)
-         and
-         [FS API](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html)s
-         from `xetex.js`.
+    *   `xetex.pre.worker.js` and `xetex.post.worker.js` files whose contents are 
+        added before/after the generated JavaScript `xetex.worker.js`. They contain
+        contain glue to call the
+        [Module](https://kripken.github.io/emscripten-site/docs/api_reference/module.html)
+        and
+        [FS API](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html)s
+        from `xetex.js`.
 *   `xetex/xelatex.fmt` a TeX memory dump that needs to be available in order to
     compile garden variety LaTeX documents.
 *   `texlive.lst` a manifest file that lists all of the usable files in the TeX
