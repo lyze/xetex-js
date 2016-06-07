@@ -87,6 +87,25 @@ downloads the full TeX Live distribution. If you have a full TeX Live
 distribution on your computer, you can set `USE_SYSTEM_TL=1` when you invoke
 `make`. This part can most likely be improved.
 
+There is a lot of output when running `make`. Standard output is sent to
+`make.log` by default and standard error is kept on the screen. You may want to
+invoke the build with `make 2>&1 | tee log.txt`. Errors during the build are to
+be expected (but the overall invocation should be successful), since the
+strategy is to `make` as far as possible before replacing missing tools from
+the corresponding native build tree.
+
+Configuring [`kpathsea`](https://www.tug.org/texinfohtml/kpathsea.html) search
+paths is tricky, so refer to the example for more guidance.
+
+One of the first things that `xetex` does on startup is to stat for the location
+of the executable. However, the program image doesn't actually exist on the
+filesystem. If using the web worker, this is already handled. The way this is
+done is to set `Module.thisProgram` to some path, say `./xelatex`, and then
+ensure that there is a dummy file at that path in the actual filesystem:
+```
+FS.createDataFile('/', Module.thisProgram, 'Dummy file for kpathsea.', true, true);
+```
+This is what `xetex.pre.worker.js` does.
 
 
 # License

@@ -28,9 +28,16 @@ NATIVE_BUILD_DIR = build-native/
 EMSCRIPTEN_BUILD_DIR = build-js/
 SOURCES_DIR = build-sources/
 
-VERBOSE_LOG = make.log
+VERBOSE_LOG = $(abspath make.log)
 $(info Standard output from configure and recursive make calls will be sent to $(VERBOSE_LOG).)
 
+# We separately define the sizes and alignments of integer types. Otherwise,
+# when setting EMCONFIGURE_JS=2, configure silently passes with an *empty*
+# result. This happens because configure writes integer sizes to a file, but
+# Emscripten does not come with persistent filesystem support by default. This
+# is the simplest way to pass these configure checks. We need EMCONFIGURE_JS=2
+# in some places to pass other configure checks that look for symbol
+# definitions in Emscripten-compiled libraries.
 JS_CONFIG_SITE = config.site
 JS_CONFIG_SITE_ABS = $(realpath $(JS_CONFIG_SITE))
 ifeq ($(JS_CONFIG_SITE_ABS),)
@@ -171,7 +178,7 @@ confirm-clean:
 
 .PHONY: clean-js
 clean-js: confirm-clean
-	rm -r $(EMSCRIPTEN_BUILD_DIR)
+	rm -rf $(EMSCRIPTEN_BUILD_DIR)
 	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
 	rm -f xetex.bc xetex.js xetex.worker.js xetex.worker.js.mem
 	rm -f $(VERBOSE_LOG)
@@ -221,7 +228,9 @@ $(FONTCONFIG_SOURCE_DIR)configure: $(FONTCONFIG_ARCHIVE) | $(SOURCES_DIR)
 	cd $(SOURCES_DIR) && patch -p0 < $$OLDPWD/fontconfig-fcstat.c.patch
 	test -s $@ && touch $@
 
-# Use XeTeX's version of libfreetype
+# Use XeTeX's version of libfreetype that we compiled to JS. We need
+# EMCONFIGURE_JS=2 to pass a configure check for fontconfig libraries because we
+# specified the JavaScript version of fontconfig in the top-most configuration.
 $(LIB_FONTCONFIG): $(FONTCONFIG_SOURCE_DIR)configure $(LIB_EXPAT) $(LIB_FREETYPE)
 	mkdir -p $(FONTCONFIG_BUILD_DIR)
 	cd $(FONTCONFIG_BUILD_DIR) && EMCONFIGURE_JS=2 CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --disable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/ -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS=-I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/ >> $(VERBOSE_LOG)
@@ -265,15 +274,9 @@ $(LIB_FREETYPE): build-js-xetex-configured.stamp $(NATIVE_BUILD_DIR)libs/freetyp
 		emmake $(MAKE) -C $(XETEX_BUILD_DIR)libs >> $(VERBOSE_LOG); \
 	fi
 
-# We need EMCONFIGURE_JS=2 to pass a configure check for fontconfig libraries
-# because we specified JavaScript version of fontconfig in the top-most
-# configuration. We need -Wno-error=implicit-function-declaration to get past a
-# (v)snprintf configure check in kpathsea. We define ELIDE_CODE to avoid
-# duplicate symbols in kpathsea's own version of getopts. We define SIZEOF_LONG
-# and SIZEOF_INT in a config.site because configure gives an *empty* result.
-# This happens because we did not especially compile and mount a filesystem, and
-# it would be a hassle just for this configure check.
-
+# We need -Wno-error=implicit-function-declaration to get past a (v)snprintf
+# configure check in kpathsea. We define ELIDE_CODE to avoid duplicate symbols
+# in kpathsea's own version of getopts.
 build-js-xetex-configured.stamp: $(XETEX_SOURCE_DIR)build.sh
 	@echo '>>>' Configuring xetex...
 	mkdir -p $(XETEX_BUILD_DIR)

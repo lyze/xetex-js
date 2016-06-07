@@ -62,7 +62,7 @@ export class XeTeXController {
    * @example
    * controller.sendMessage({
    *   namespace: 'Module', command: 'callMain',
-   *   arguments: [['-interaction=nonstopmode', './source.tex']]
+   *   arguments: [['-interaction=nonstopmode', 'source.tex']]
    * })
    * @example
    * // Specify a success value if ordinarily the return value is not structured

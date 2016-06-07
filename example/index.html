@@ -10,11 +10,14 @@
         console.log('Reloading xetex...');
         return controller.reload().then(function() {
           console.log('Setting up virtual in-memory filesystem environment...');
+
+          // Create the TeX memory dump in the filesystem.
           controller.sendMessage({
             namespace: 'FS', command: 'createLazyFile',
             arguments: ['/', 'xelatex.fmt', '../xetex/xelatex.fmt', true, false],
             ret: null
           });
+
           // We will mount TeX Live in texlive-basic/, so set up some overrides.
           // Remember that earlier definitions override later ones in the kpathsea
           // search path.
@@ -29,7 +32,10 @@
               true, false],
             ret: null
           });
-          // Put the texmf.cnf on the kpathsea search path.
+
+          // Make the provided web2c/texmf.cnf available on the kpathsea search
+          // path. The location of this file needs to come after our custom
+          // texmf.cnf in the search order.
           controller.sendMessage({
             namespace: 'FS', command: 'createPath',
             arguments: ['/', 'share/texmf-dist/web2c/', true, true],
