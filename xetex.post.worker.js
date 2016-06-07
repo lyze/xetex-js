@@ -57,7 +57,7 @@ var replyThroughPort = function(event, msg, altMsg) {
   if (msg.error) {
     // Transform errors to allow structured cloning
     var error = msg.error;
-    if (error instanceof FS.ErrnoError) {
+    if (FS && FS.ErrnoError && error instanceof FS.ErrnoError) {
       msg.error = {
         code: error.code,
         errno: error.errno,

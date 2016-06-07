@@ -44,6 +44,11 @@ ifeq ($(JS_CONFIG_SITE_ABS),)
 $(error Cannot find JS_CONFIG_SITE: $(JS_CONFIG_SITE))
 endif
 
+XETEX_JS = xetex.js
+XELATEX_JS = xelatex.js
+XETEX_BUILD_DIR = $(EMSCRIPTEN_BUILD_DIR)build-xetex/
+XETEX_BC = $(XETEX_BUILD_DIR)texk/web2c/xetex
+
 XETEX_ARCHIVE = xetex-0.9999.3.tar.bz2
 XETEX_SOURCE_DIR = $(SOURCES_DIR)xetex-0.9999.3/
 XETEX_ARCHIVE_URL = 'http://downloads.sourceforge.net/project/xetex/source/xetex-0.9999.3.tar.bz2?r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fxetex%2F&ts=1464938493&use_mirror=netassist'
@@ -64,9 +69,6 @@ LATEX_BASE_ARCHIVE_URL = http://mirrors.ctan.org/macros/latex/base.zip
 
 INSTALL_TL_UNX_ARCHIVE = install-tl-unx.tar.gz
 INSTALL_TL_UNX_ARCHIVE_URL = http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
-
-XETEX_BUILD_DIR = $(EMSCRIPTEN_BUILD_DIR)build-xetex/
-XETEX_BC = $(XETEX_BUILD_DIR)texk/web2c/xetex
 
 # The Emscripten site recommends that we generate .so files over .a files...
 LIB_FREETYPE = $(XETEX_BUILD_DIR)libs/freetype2/ft-build/.libs/libfreetype.a
@@ -152,7 +154,7 @@ endif
 
 
 .PHONY: all
-all: xetex.js xetex.worker.js xetex/xelatex.fmt texlive.lst
+all: $(XETEX_JS) $(XELATEX_JS) xetex.worker.js xelatex.fmt texlive.lst
 
 .PHONY: texlive-manifest
 texlive-manifest: texlive.lst
@@ -180,7 +182,7 @@ confirm-clean:
 clean-js: confirm-clean
 	rm -rf $(EMSCRIPTEN_BUILD_DIR)
 	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
-	rm -f xetex.bc xetex.js xetex.worker.js xetex.worker.js.mem
+	rm -f xetex.bc $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_JS) $(XELATEX_JS).mem xetex.worker.js xetex.worker.js.mem
 	rm -f $(VERBOSE_LOG)
 
 .PHONY: clean
@@ -312,10 +314,13 @@ xetex.bc: $(XETEX_BC)
 
 xetex.worker.js: xetex.bc xetex.pre.worker.js xetex.post.worker.js
 #	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
-	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
+	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
 
-xetex.js: xetex.bc
-	emcc -O2 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
+$(XETEX_JS): xetex.bc xetex.pre.js
+	emcc -O2 --closure 1 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
+
+$(XELATEX_JS): $(XETEX_JS)
+	cp $< $@
 
 ###############################################################################
 # xelatex.fmt
@@ -328,8 +333,7 @@ $(LATEX_BASE_SOURCE_DIR): $(LATEX_BASE_ARCHIVE)
 	test -d $@ && touch $@
 
 # Remember that we need to set argv[0] to xelatex when we invoke xetex.
-xetex/xelatex.fmt: $(LATEX_BASE_SOURCE_DIR)latex.fmt
-	mkdir -p xetex/
+xelatex.fmt: $(LATEX_BASE_SOURCE_DIR)latex.fmt
 	cp $< $@
 
 ifdef USE_SYSTEM_TL
