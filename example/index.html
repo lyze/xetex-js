@@ -1,8 +1,8 @@
 <html>
   <head>
-    <script src="../xetex.umd.js"></script>
+    <script src="../xetexcontroller.umd.js"></script>
     <script>
-      /* global xetex */
+      /* global xetexcontroller */
       // Setup virtual filesystem and return a promise. We need to call this
       // function every time the xetex image reloads, since the filesystem
       // defaults to an in-memory filesystem with no persistence.
@@ -107,21 +107,22 @@
       // requests compile
       var autoReload = false;
       var reloaded; // avoid preparing the FS multiple times
-      var controller = new xetex.XeTeX('../xetex.worker.js', function(e) {
-        var response = e.data;
-        switch (response.channel) {
-          case 'stdout':
-            console.log(response.data);
-            break;
+      var controller = new xetexcontroller.XeTeXController(
+        '../xetex.worker.js', function(e) {
+          var response = e.data;
+          switch (response.channel) {
+            case 'stdout':
+              console.log(response.data);
+              break;
 
-          case 'stderr':
-            console.warn(response.data);
-            break;
+            case 'stderr':
+              console.warn(response.data);
+              break;
 
-          default:
-            console.error('Unknown channel: ' + response.channel);
-        }
-      });
+            default:
+              console.error('Unknown channel: ' + response.channel);
+          }
+        });
 
       document.addEventListener('DOMContentLoaded', function() {
         var autoReloadCheckbox = document.getElementById('auto-reload');
@@ -173,7 +174,7 @@
   </head>
   <body>
     <form id="form">
-      <label for="auto-reload">Immediately reload the program image and filesystem after exit</label>
+      <label for="auto-reload">Immediately reload the program image and filesystem after program exit</label>
       <input id="auto-reload" type="checkbox">
       <label for="source">Source</label>
       <textarea id="source"></textarea>

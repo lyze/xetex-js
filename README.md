@@ -26,21 +26,22 @@ An internet connection is required.
 Artifacts:
 
 *   `xetex.bc` linked bitcode that can be compiled into JavaScript
-*   `xetex.js` an ES6 module to interact with `xetex.worker.js`.
-*   `xetex.umd.js` a UMD module to interact with `xetex.worker.js`.
-*   `xetex.worker.js` the compiled JavaScript file that ought to be loaded into
-    a
+*   `xetex.js` executable for a JavaScript engine
+*   `xetex.worker.js`compiled JavaScript file that ought to be loaded into a
+    browser
     [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API).
-    *   `xetex.pre.worker.js` and `xetex.post.worker.js` files whose contents are 
+    *   `xetex.pre.worker.js` and `xetex.post.worker.js` files whose contents are
         added before/after the generated JavaScript `xetex.worker.js`. They contain
         contain glue to call the
         [Module](https://kripken.github.io/emscripten-site/docs/api_reference/module.html)
         and
         [FS API](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html)s
-        from `xetex.js`.
-*   `xetex/xelatex.fmt` a TeX memory dump that needs to be available in order to
-    compile garden variety LaTeX documents.
-*   `texlive.lst` a manifest file that lists all of the usable files in the TeX
+        from `xetexcontroller.js`.
+*   `xetexcontroller.js` ES6 browser module to interact with `xetex.worker.js`.
+*   `xetexcontroller.umd.js` UMD browser module to interact with `xetex.worker.js`.
+*   `xetex/xelatex.fmt` TeX memory dump that needs to be available in order to
+    compile garden-variety LaTeX documents.
+*   `texlive.lst` manifest file that lists all of the usable files in the TeX
     Live (basic) distribution. The example uses this manifest file to create a
     virtual filesystem environment that is necessary to compile LaTeX documents.
 

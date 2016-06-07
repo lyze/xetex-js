@@ -1,0 +1,17 @@
+xetex.js
+xetex.post.worker.js
+xetex.pre.worker.js
+xetex.worker.js
+xetexcontroller.min.js
+xetexcontroller.umd.js
+xetexcontroller.umd.min.js
+
+node_modules/
+
+base/
+build-*/
+expat-*/
+fontconfig-*/
+install-tl-*/
+texlive-*/
+xetex*/

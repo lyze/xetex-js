@@ -13,7 +13,7 @@
  * The worker also communicates {@code stdout} and {@code stdin}.
  *
  * @example
- * var controller = new XeTeX('xetex.worker.js', response => {
+ * var controller = new XeTeXController('xetex.worker.js', response => {
  *   switch (response.channel) {
  *     case 'stdout':
  *       console.log(response.data);
@@ -27,7 +27,7 @@
  *   console.error(e);
  * });
  */
-export class XeTeX {
+export class XeTeXController {
   /**
    * Creates a controller for a worker that will run a xetex process. The worker
    * immediately begins the initialization process.
