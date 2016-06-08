@@ -79,6 +79,12 @@ steps in the build. Since, the generated JavaScript code cannot be run directly,
 the required executables are copied from the native build and then the build is
 continued.
 
+Emscripten's linking model is rather monolithic. It does not support true
+dynamic linking. As a result, we have to patch the code and redefine some macros
+to prevent duplicate symbols
+([like in this issue](https://github.com/kripken/emscripten/issues/831)). The
+duplicate symbols come from `freetype2` because `xetex` depends on `fontconfig`
+and `freetype2`, but `fontconfig` also depends on `freetype2`.
 
 ## Hints
 

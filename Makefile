@@ -73,7 +73,8 @@ INSTALL_TL_UNX_ARCHIVE_URL = http://mirror.ctan.org/systems/texlive/tlnet/instal
 # The Emscripten site recommends that we generate .so files over .a files...
 LIB_FREETYPE = $(XETEX_BUILD_DIR)libs/freetype2/ft-build/.libs/libfreetype.a
 LIB_EXPAT = $(EXPAT_BUILD_DIR).libs/libexpat.a
-# Using libfontconfig.a mysteriously fails with:
+# Using libfontconfig.a mysteriously fails a configure check (and final link
+# step) with:
 # ```AssertionError: Failed to run LLVM optimizations:```
 LIB_FONTCONFIG = $(FONTCONFIG_BUILD_DIR)src/.libs/libfontconfig.so
 
@@ -81,11 +82,15 @@ LIB_FONTCONFIG = $(FONTCONFIG_BUILD_DIR)src/.libs/libfontconfig.so
 #
 # We use xetex's own freetype2 configuration. In order to do that, we build
 # libs/freetype2 first before building the rest of the tree. We also explicitly
-# hack in the dependency on libexpat.
+# hack in using libfontconfig.so as well as libexpat.
 #
 # FIXME: These flags don't seem to disable multithreading.
 # Pass --disable-threads to propagate down to the ICU library.
 # Pass --disable-multithreaded to propagate down the poppler library.
+#
+#
+
+
 XETEX_CONF =										\
 	--enable-compiler-warnings=yes							\
 	--disable-all-pkgs								\
@@ -100,8 +105,8 @@ XETEX_CONF =										\
 	--enable-silent-rules								\
 	--enable-dump-share								\
 	--with-fontconfig-includes=$(abspath $(FONTCONFIG_SOURCE_DIR))			\
-	--with-fontconfig-libdir='$(abspath $(dir $(LIB_FONTCONFIG)))			\
-		-L$(abspath $(dir $(LIB_EXPAT))) -lfontconfig -lexpat'			\
+	--with-fontconfig-libdir='. $(abspath $(LIB_FONTCONFIG))			\
+		-L$(abspath $(dir $(LIB_EXPAT))) -lexpat'				\
 	--with-freetype2-includes=$(abspath						\
 		$(XETEX_SOURCE_DIR)source/libs/freetype2/freetype-2.4.11/include/)	\
 	--with-freetype2-libdir=$(abspath $(XETEX_BUILD_DIR)libs/freetype2/)		\
@@ -205,8 +210,12 @@ $(SOURCES_DIR):
 $(XETEX_ARCHIVE):
 	curl -L $(XETEX_ARCHIVE_URL) -o $@
 
+# Patch some freetype macros to avoid multiply-defined symbols because
+# Emscripten assumes a monolithic model for linking. Additional macros in CFLAGS
+# are defined later in the configure stage.
 $(XETEX_SOURCE_DIR)build.sh: $(XETEX_ARCHIVE)
 	tar xf $< -C $(SOURCES_DIR)
+	cd $(SOURCES_DIR) && patch -p0 < $$OLDPWD/freetype-internal-ftrfork.h.patch
 	test -s $@ && touch $@
 
 $(EXPAT_ARCHIVE):
@@ -235,7 +244,7 @@ $(FONTCONFIG_SOURCE_DIR)configure: $(FONTCONFIG_ARCHIVE) | $(SOURCES_DIR)
 # specified the JavaScript version of fontconfig in the top-most configuration.
 $(LIB_FONTCONFIG): $(FONTCONFIG_SOURCE_DIR)configure $(LIB_EXPAT) $(LIB_FREETYPE)
 	mkdir -p $(FONTCONFIG_BUILD_DIR)
-	cd $(FONTCONFIG_BUILD_DIR) && EMCONFIGURE_JS=2 CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --disable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/ -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS=-I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/ >> $(VERBOSE_LOG)
+	cd $(FONTCONFIG_BUILD_DIR) && EMCONFIGURE_JS=2 CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/ -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS=-I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/ >> $(VERBOSE_LOG)
 	emmake $(MAKE) -C $(FONTCONFIG_BUILD_DIR) >> $(VERBOSE_LOG)
 	test -s $@ && touch $@
 
@@ -263,6 +272,7 @@ native-tools.stamp: $(XETEX_SOURCE_DIR)build.sh
 	$(MAKE) -C $(NATIVE_BUILD_DIR)libs/ >> $(VERBOSE_LOG)
 	$(MAKE) -C $(NATIVE_BUILD_DIR)libs/icu/ >> $(VERBOSE_LOG)
 	$(MAKE) -C $(NATIVE_BUILD_DIR)libs/icu/icu-build/ >> $(VERBOSE_LOG)
+	touch $@
 
 $(NATIVE_XETEX): native-tools.stamp
 	$(MAKE) -C $(NATIVE_BUILD_DIR)texk/web2c/ xetex >> $(VERBOSE_LOG)
@@ -293,7 +303,7 @@ build-js-xetex-toplevel.stamp: build-js-xetex-configured.stamp $(LIB_FONTCONFIG)
 # "Inject" native tools used in the compilation
 $(XETEX_BC): build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
 	@echo '>>>' Building xetex...
-	if EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG); then \
+	if CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG); then \
 		echo '>>>' Done!; \
 	else \
 		echo '>>>' First xetex make attempt failed. && \
@@ -309,15 +319,23 @@ $(XETEX_BC): build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
 	fi
 	EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG)
 
-xetex.bc: $(XETEX_BC)
-	cp $< $@
 
-xetex.worker.js: xetex.bc xetex.pre.worker.js xetex.post.worker.js
+# Manually perform the final link step. The exact objects to use are determined
+# from the last step of linking xetex. Doing it this way somehow avoids
+# multiply-defined symbol problems. ¯\_(ツ)_/¯
+
+xetex_web2c_dir = $(XETEX_BUILD_DIR)texk/web2c/
+web2c_objs = $(addprefix $(xetex_web2c_dir), xetexdir/xetex-xetexextra.o synctexdir/xetex-synctex.o xetex-xetexini.o xetex-xetex0.o xetex-xetex-pool.o)
+xetex_libs_dir = $(XETEX_BUILD_DIR)libs/
+xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/libgraphite2.a icu/icu-build/lib/libicuuc.a icu/icu-build/lib/libicudata.a teckit/libTECkit.a poppler/libpoppler.a libpng/libpng.a)
+xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
+
+$(XETEX_JS): xetex.pre.js $(XETEX_BC)
+	em++ -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link)
+
+xetex.worker.js: $(XETEX_BC) xetex.pre.worker.js xetex.post.worker.js
 #	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
-	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
-
-$(XETEX_JS): xetex.bc xetex.pre.js
-	emcc -O2 --closure 1 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
+	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s ASSERTIONS=2 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912
 
 $(XELATEX_JS): $(XETEX_JS)
 	cp $< $@

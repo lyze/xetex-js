@@ -1,0 +1,11 @@
+--- xetex-0.9999.3/source/libs/freetype2/freetype-2.4.11/include/freetype/internal/ftrfork.h
++++ xetex-0.9999.3/source/libs/freetype2/freetype-2.4.11/include/freetype/internal/ftrfork.h
+@@ -83,7 +83,7 @@
+
+   /* this array is a storage in non-PIC mode, so ; is needed in END */
+ #define CONST_FT_RFORK_RULE_ARRAY_BEGIN( name, type )  \
+-          const type name[] = {
++          static const type name[] = {
+ #define CONST_FT_RFORK_RULE_ARRAY_ENTRY( func_suffix, type_suffix )  \
+           { raccess_guess_ ## func_suffix,                           \
+             FT_RFork_Rule_ ## type_suffix },

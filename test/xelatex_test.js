@@ -45,4 +45,6 @@ test('xelatex', suite => {
       t.end();
     });
   });
+
+  suite.end();
 });
