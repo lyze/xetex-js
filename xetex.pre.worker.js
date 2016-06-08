@@ -34,7 +34,7 @@ var Module = {
 var xetexCore = function(Module) {
   Module.preInit = function() {
     try {
-      FS.createDataFile('/', Module.thisProgram, 'Dummy file for kpathsea.', true, true);
+      FS.createDataFile('.', Module.thisProgram, 'Dummy file for kpathsea.', true, true);
     } catch (e) {
       if (e.errno === ERRNO_CODES.EEXIST) {
         return;

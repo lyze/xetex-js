@@ -187,7 +187,7 @@ confirm-clean:
 clean-js: confirm-clean
 	rm -rf $(EMSCRIPTEN_BUILD_DIR)
 	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
-	rm -f xetex.bc $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_JS) $(XELATEX_JS).mem xetex.worker.js xetex.worker.js.mem
+	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_JS) $(XELATEX_JS).mem xetex.worker.js xetex.worker.js.mem
 	rm -f $(VERBOSE_LOG)
 
 .PHONY: clean
@@ -276,6 +276,7 @@ native-tools.stamp: $(XETEX_SOURCE_DIR)build.sh
 
 $(NATIVE_XETEX): native-tools.stamp
 	$(MAKE) -C $(NATIVE_BUILD_DIR)texk/web2c/ xetex >> $(VERBOSE_LOG)
+	test -s $@ && touch $@
 
 $(LIB_FREETYPE): build-js-xetex-configured.stamp $(NATIVE_BUILD_DIR)libs/freetype2/ft-build/apinames
 	echo '>>>' Building xetex libraries...
@@ -285,6 +286,8 @@ $(LIB_FREETYPE): build-js-xetex-configured.stamp $(NATIVE_BUILD_DIR)libs/freetyp
 		cp --preserve=mode $(NATIVE_BUILD_DIR)libs/freetype2/ft-build/apinames $(XETEX_BUILD_DIR)libs/freetype2/ft-build/apinames && \
 		emmake $(MAKE) -C $(XETEX_BUILD_DIR)libs >> $(VERBOSE_LOG); \
 	fi
+	test -s $@ && touch $@
+
 
 # We need -Wno-error=implicit-function-declaration to get past a (v)snprintf
 # configure check in kpathsea. We define ELIDE_CODE to avoid duplicate symbols
@@ -318,6 +321,7 @@ $(XETEX_BC): build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
 		EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG); \
 	fi
 	EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG)
+	test -s $@ && touch $@
 
 
 # Manually perform the final link step. The exact objects to use are determined
@@ -331,14 +335,15 @@ xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/lib
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
 $(XETEX_JS): xetex.pre.js $(XETEX_BC)
-	em++ -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link)
-
-xetex.worker.js: $(XETEX_BC) xetex.pre.worker.js xetex.post.worker.js
-#	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s ASSERTIONS=2 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
-	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s ASSERTIONS=2 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912
+#	em++ -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=268435456
+	em++ -g -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=268435456 -s ASSERTIONS=2
 
 $(XELATEX_JS): $(XETEX_JS)
 	cp $< $@
+
+xetex.worker.js: $(XETEX_BC) xetex.pre.worker.js xetex.post.worker.js
+#	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
+	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s ASSERTIONS=2 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912
 
 ###############################################################################
 # xelatex.fmt
