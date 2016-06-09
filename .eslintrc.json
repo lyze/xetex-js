@@ -1,0 +1,9 @@
+{
+  "extends": "google",
+  "env": {
+    "browser": 1
+  },
+  "plugins": [
+    "html"
+  ]
+}
