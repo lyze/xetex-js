@@ -1,10 +1,18 @@
-/* global ENVIRONMENT_IS_NODE, FS, NODEFS */
+/* global ENV, ENVIRONMENT_IS_NODE, FS, NODEFS */
 var Module = {
-  thisProgram: './xelatex',
+  thisProgram: './cwd/xelatex',
   preInit: function() {
-    FS.createDataFile('.', Module.thisProgram, 'Dummy file for kpathsea.', true, true);
     if (ENVIRONMENT_IS_NODE) {
-      FS.mount(NODEFS, {root: '.'}, '.'); // TODO... hmmm....
+      FS.mkdir('cwd');
+      FS.mount(NODEFS, {root: '.'}, 'cwd');
+    }
+  },
+  preRun: function() {
+    if (ENVIRONMENT_IS_NODE) {
+      ENV.TEXMFDIST = '{cwd,cwd/texlive,cwd/texlive-basic,cwd/texlive-full}/texmf-dist';
+      ENV.TEXMFCNF = 'cwd/:$TEXMFDIST/web2c/:';
+      ENV.TEXINPUTS = 'cwd/:';
+      ENV.TEXFORMATS = 'cwd/:';
     }
   }
 };

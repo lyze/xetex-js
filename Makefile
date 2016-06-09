@@ -46,6 +46,7 @@ endif
 
 XETEX_JS = xetex.js
 XELATEX_JS = xelatex.js
+XELATEX_EXE = xelatex
 XETEX_BUILD_DIR = $(EMSCRIPTEN_BUILD_DIR)build-xetex/
 XETEX_BC = $(XETEX_BUILD_DIR)texk/web2c/xetex
 
@@ -159,7 +160,7 @@ endif
 
 
 .PHONY: all
-all: $(XETEX_JS) $(XELATEX_JS) xetex.worker.js xelatex.fmt texlive.lst
+all: $(XETEX_JS) $(XELATEX_JS) $(XELATEX_EXE) xetex.worker.js xelatex.fmt texlive.lst xdvipdfmx
 
 .PHONY: texlive-manifest
 texlive-manifest: texlive.lst
@@ -169,17 +170,17 @@ confirm-clean:
 	@while :; do							\
 		read -p 'Really clean (yes/no)? ' choice;		\
 		case "$$choice" in					\
-	  		yes|ye|y|YES|YE|Y) exit;;			\
-	  		n|N|no|NO) exit -1;;				\
-	  		* ) echo -n 'Please enter either yes or no. ';;	\
+			yes|ye|y|YES|YE|Y) exit;;			\
+			n|N|no|NO) exit -1;;				\
+			*) echo -n 'Please enter either yes or no. ';;	\
 		esac;							\
 	done
 	@while :; do							\
 		read -p 'Are you absolutely sure (yes/no)? ' choice;	\
 		case "$$choice" in					\
-	  		yes|ye|y|YES|YE|Y) exit;;			\
-	  		n|N|no|NO) exit -1;;				\
-	  		* ) echo -n 'Please enter either yes or no. ';;	\
+			yes|ye|y|YES|YE|Y) exit;;			\
+			n|N|no|NO) exit -1;;				\
+			*) echo -n 'Please enter either yes or no. ';;	\
 		esac;							\
 	done
 
@@ -187,7 +188,7 @@ confirm-clean:
 clean-js: confirm-clean
 	rm -rf $(EMSCRIPTEN_BUILD_DIR)
 	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
-	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_JS) $(XELATEX_JS).mem xetex.worker.js xetex.worker.js.mem
+	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem xetex.worker.js xetex.worker.js.mem
 	rm -f $(VERBOSE_LOG)
 
 .PHONY: clean
@@ -211,8 +212,7 @@ $(XETEX_ARCHIVE):
 	curl -L $(XETEX_ARCHIVE_URL) -o $@
 
 # Patch some freetype macros to avoid multiply-defined symbols because
-# Emscripten assumes a monolithic model for linking. Additional macros in CFLAGS
-# are defined later in the configure stage.
+# Emscripten assumes a monolithic model for linking.
 $(XETEX_SOURCE_DIR)build.sh: $(XETEX_ARCHIVE)
 	tar xf $< -C $(SOURCES_DIR)
 	cd $(SOURCES_DIR) && patch -p0 < $$OLDPWD/freetype-internal-ftrfork.h.patch
@@ -335,11 +335,17 @@ xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/lib
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
 $(XETEX_JS): xetex.pre.js $(XETEX_BC)
-#	em++ -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=268435456
-	em++ -g -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=268435456 -s ASSERTIONS=2
+#	em++ -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912
+	em++ -g -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912
 
 $(XELATEX_JS): $(XETEX_JS)
-	cp $< $@
+	ln -srf $< $@
+
+.DELETE_ON_ERROR: $(XETEX_EXE)
+$(XELATEX_EXE): $(XELATEX_JS)
+	echo '#!/usr/bin/env node' > $@
+	cat $(XELATEX_JS) >> $@
+	chmod a+x $@
 
 xetex.worker.js: $(XETEX_BC) xetex.pre.worker.js xetex.post.worker.js
 #	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
@@ -370,6 +376,16 @@ else
 $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive-full.stamp
 	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) unpack.ins
 	TEXMF=texlive-full/texmf-dist//: TEXMFCNF=texlive-full/:texlive-full/texmf-dist/web2c/ TEXINPUTS=$(LATEX_BASE_SOURCE_DIR): $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) latex.ltx
+
+# You can also build with the xelatex JS. Requires
+#     ENV.TEXMFDIST = '{cwd,cwd/texlive,cwd/texlive-basic,cwd/texlive-full}/texmf-dist';
+#     ENV.TEXMFCNF = 'cwd/:$TEXMFDIST/web2c/:';
+#     ENV.TEXINPUTS = 'cwd/:';
+#     ENV.TEXFORMATS = 'cwd/:';
+
+# $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(XELATEX) $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive-full.stamp
+#	TEXINPUTS=cwd/base/: ./$(XELATEX) -ini -etex -output-directory=cwd/base/ unpack.ins
+#	TEXINPUTS=cwd/base/: ./$(XELATEX) -ini -etex -output-directory=cwd/base/ latex.ltx
 
 endif # USE_SYSTEM_TL
 

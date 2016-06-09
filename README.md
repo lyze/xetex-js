@@ -1,6 +1,6 @@
 # xetex-js
 
-This is a port of XeTeX to JavaScript.
+This is a port of XeTeX to JavaScript using Emscripten.
 
 See the example for usage in a web browser. Compilation of LaTeX documents
 occurs strictly in the browser. Since filesystem access needs to be emulated,
@@ -25,10 +25,15 @@ An internet connection is required.
 
 Artifacts:
 
-*   `xetex.bc` linked bitcode that can be compiled into JavaScript
-*   `xetex.js` executable for a JavaScript engine
+*   `xetex.js` module for a JavaScript engine.
+*   `xelatex.js` same module as `xetex.js` except with a different name.
+*   `xelatex` executable. Runs with `#!/usr/bin/env node`.
+*   `xdvipdfmx.js` module for a Javascript engine.
+*   `xdvipdfmx` executable. **Not yet Emscriptified.** Runs with `#!/usr/bin/env node`.
+    This is the required backend to produce PDF output from `xelatex`. Note that
+    this should live next to `xelatex`.
 *   `xetex.worker.js`compiled JavaScript file that ought to be loaded into a
-    browser
+    browser as a
     [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API).
     *   `xetex.pre.worker.js` and `xetex.post.worker.js` files whose contents are
         added before/after the generated JavaScript `xetex.worker.js`. They contain
@@ -63,6 +68,12 @@ It is not feasible to execute the main function multiple times because there are
 memory leaks. The easiest (and best) way to run the program multiple times with
 a clean state is to create a new instance every time.
 
+If `xdvipdfmx` is not built or can't be found, attempts to create PDFs will fail
+mysteriously with
+```
+! I can't write on file `hello_world.pdf'.
+```
+
 [Emscripten does not have a pluggable filesystem at this time.](https://github.com/kripken/emscripten/issues/777)
 
 If you use
@@ -86,12 +97,17 @@ to prevent duplicate symbols
 duplicate symbols come from `freetype2` because `xetex` depends on `fontconfig`
 and `freetype2`, but `fontconfig` also depends on `freetype2`.
 
+
 ## Hints
 
 One major bottleneck is the creation of a `xelatex.fmt` memory dump, which
 downloads the full TeX Live distribution. If you have a full TeX Live
 distribution on your computer, you can set `USE_SYSTEM_TL=1` when you invoke
-`make`. This part can most likely be improved.
+`make`. You can also skip this step and use a prebuilt `xelatex.fmt` for the
+same version of XeTeX, even if the `xelatex.fmt` file was originally built
+natively, The file is just a memory dump of the XeTeX engine, and supposing that
+the Emscripten compilation is correct, the produced/consumed dump formats should
+be equivalent.
 
 There is a lot of output when running `make`. Standard output is sent to
 `make.log` by default and standard error is kept on the screen. You may want to
@@ -103,15 +119,22 @@ the corresponding native build tree.
 Configuring [`kpathsea`](https://www.tug.org/texinfohtml/kpathsea.html) search
 paths is tricky, so refer to the example for more guidance.
 
-One of the first things that `xetex` does on startup is to stat for the location
-of the executable. However, the program image doesn't actually exist on the
-filesystem. If using the web worker, this is already handled. The way this is
-done is to set `Module.thisProgram` to some path, say `./xelatex`, and then
-ensure that there is a dummy file at that path in the actual filesystem:
-```
+One of the first things that XeTeX does on startup is to stat for the location
+of the executable. However, when using a web worker, the program image doesn't
+actually exist on the virtual filesystem. The workaround is to set
+`Module.thisProgram` to some path, say `./xelatex`, and then ensure that there
+is a dummy file at that path in the actual filesystem:
+```js
 FS.createDataFile('/', Module.thisProgram, 'Dummy file for kpathsea.', true, true);
 ```
 This is what `xetex.pre.worker.js` does.
+
+When using the executable file in a terminal-like environment, we can make our
+Em-XeTeX behave more closely to native XeTeX. One major limitation is that
+[the root directory of the native filesystem cannot be mounted as the root of the virtual filesystem](https://github.com/kripken/emscripten/issues/2040).
+This is adressed by mounting the (native) current working directory in the
+virtual directory `/cwd`. Thus, the file [xetex.pre.js](xetex.pre.js) employs
+some trickery to have `kpathsea` search `/cwd` as well.
 
 
 # License

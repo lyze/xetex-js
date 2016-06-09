@@ -1,0 +1,17 @@
+# XeTeX
+*.aux
+*.log
+*.pdf
+*.xdv
+
+# Build
+build-*/
+*.log
+*.profile
+*.stamp
+*.tar.bz2
+*.tar.gz
+*.zip
+
+# Node
+node_modules/

@@ -5,17 +5,25 @@ import path from 'path';
 
 import test from 'tape';
 
-const PATH_TO_XELATEX = path.join(__dirname, '..', 'xelatex.js');
+const PROJECT_ROOT = path.join(__dirname, '..');
+const PATH_TO_XELATEX = path.join(PROJECT_ROOT, 'xelatex.js');
 
 const DEFAULT_ENV = {
   cwd: path.join(__dirname, '..')
 };
 
-const tex = filename => {
+// Returns the path on the filesystem to a sample tex file.
+const actualPath = filename => {
   if (filename) {
     return path.join(__dirname, 'samples', filename);
   }
   return path.join(__dirname, 'samples');
+};
+
+// Returns a path usable by the virtual xelatex filesystem for a sample tex
+// file.
+const xelatexPath = filename => {
+  return path.join('cwd', path.relative(PROJECT_ROOT, actualPath(filename)));
 };
 
 const _xelatex = (fn, args = [], options = {}) => {
@@ -41,7 +49,7 @@ test('xelatex.js exists', t => {
 
 test('xelatex has a version', t => {
   var stdout = xelatex(['-version'], (e, stdout, stderr) => {
-    console.warn(stderr);
+    t.error(e, 'exit status ok');
     if (stdout.startsWith('XeTeX 3.1415926-')) {
       t.pass('has a version string');
     } else {
@@ -62,18 +70,24 @@ test('xelatex can start up', t => {
   });
 });
 
-test('xelatex can compile hello world', t => {
-  fs.unlink(tex('hello_world.pdf'), _ => {
-    fs.access(tex('hello_world.pdf'), e => {
-      t.ok(e, `${tex('hello_world.pdf')} should not exist`);
-
-      xelatex([`-output-directory=${tex()}`, tex('hello_world.tex')], (e, stdout, stderr) => {
-        fs.access('hello_world.pdf', (e, data) => {
-          t.notOk(e, 'file should exist');
-          t.ok(data, 'file content should exist');
+test('xelatex can compile hello_world.tex to XDV', t => {
+  const xelatexOutputDir = xelatexPath();
+  const xelatexInputFile = xelatexPath('hello_world.tex');
+  const outputFile = actualPath('hello_world.xdv');
+  fs.unlink(outputFile, _ => {
+    fs.access(outputFile, e => {
+      t.ok(e, `${outputFile} does not exist before compiling`);
+      xelatex([
+        '-no-pdf', `-output-directory=${xelatexOutputDir}`, xelatexInputFile
+      ], (e, stdout, stderr) => {
+        t.error(e, 'exit status ok');
+        fs.readFile(outputFile, (e, data) => {
+          t.error(e, `${outputFile} should exist`);
+          t.ok(data, `${outputFile} should have some content`);
         });
       });
-      t.end(e);
+
+      t.end();
     });
   });
 });
