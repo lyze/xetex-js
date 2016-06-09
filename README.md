@@ -132,9 +132,9 @@ This is what `xetex.pre.worker.js` does.
 When using the executable file in a terminal-like environment, we can make our
 Em-XeTeX behave more closely to native XeTeX. One major limitation is that
 [the root directory of the native filesystem cannot be mounted as the root of the virtual filesystem](https://github.com/kripken/emscripten/issues/2040).
-This is adressed by mounting the (native) current working directory in the
-virtual directory `/cwd`. Thus, the file [xetex.pre.js](xetex.pre.js) employs
-some trickery to have `kpathsea` search `/cwd` as well.
+This is addressed by mounting the (native) current working directory in the
+virtual directory `/cwd`. The file [xetex.pre.js](xetex.pre.js) employs some
+trickery to have `kpathsea` search `/cwd` as well.
 
 
 # License
