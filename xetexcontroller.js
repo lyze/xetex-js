@@ -27,7 +27,7 @@
  *   console.error(e);
  * });
  */
-export default class XeTeXController {
+export class XeTeXController {
   /**
    * Creates a controller for a worker that will run a xetex process. The worker
    * immediately begins the initialization process.

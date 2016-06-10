@@ -61,6 +61,8 @@ required to download it.
 2.   `npm start`
 3.   Visit `example/index.html`.
 
+Note: The example doesn't do anything interesting yet!
+
 
 ## Known limitations
 
@@ -96,6 +98,8 @@ to prevent duplicate symbols
 ([like in this issue](https://github.com/kripken/emscripten/issues/831)). The
 duplicate symbols come from `freetype2` because `xetex` depends on `fontconfig`
 and `freetype2`, but `fontconfig` also depends on `freetype2`.
+
+### Controller/worker
 
 
 ## Hints

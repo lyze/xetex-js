@@ -48,7 +48,7 @@ XETEX_JS = xetex.js
 XELATEX_JS = xelatex.js
 XELATEX_EXE = xelatex
 XETEX_BUILD_DIR = $(EMSCRIPTEN_BUILD_DIR)build-xetex/
-XETEX_BC = $(XETEX_BUILD_DIR)texk/web2c/xetex
+XETEX_WORKER_JS = xetex.worker.js
 
 XETEX_ARCHIVE = xetex-0.9999.3.tar.bz2
 XETEX_SOURCE_DIR = $(SOURCES_DIR)xetex-0.9999.3/
@@ -160,7 +160,7 @@ endif
 
 
 .PHONY: all
-all: $(XETEX_JS) $(XELATEX_JS) $(XELATEX_EXE) xetex.worker.js xelatex.fmt texlive.lst xdvipdfmx
+all: $(XETEX_JS) $(XELATEX_JS) $(XELATEX_EXE) $(XETEX_WORKER_JS) xelatex.fmt texlive.lst xdvipdfmx
 
 .PHONY: texlive-manifest
 texlive-manifest: texlive.lst
@@ -188,7 +188,7 @@ confirm-clean:
 clean-js: confirm-clean
 	rm -rf $(EMSCRIPTEN_BUILD_DIR)
 	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
-	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem xetex.worker.js xetex.worker.js.mem
+	rm -f $(XETEX_JS) $(XETEX_JS).mem xdvipdfmx.worker.js xdvipdfmx.worker.js.mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem $(XETEX_WORKER_JS) $(XETEX_WORKER_JS).mem
 	rm -f $(VERBOSE_LOG)
 
 .PHONY: clean
@@ -288,6 +288,9 @@ $(LIB_FREETYPE): build-js-xetex-configured.stamp $(NATIVE_BUILD_DIR)libs/freetyp
 	fi
 	test -s $@ && touch $@
 
+###############################################################################
+# XeTeX and xdvipdfmx
+###############################################################################
 
 # We need -Wno-error=implicit-function-declaration to get past a (v)snprintf
 # configure check in kpathsea. We define ELIDE_CODE to avoid duplicate symbols
@@ -303,8 +306,14 @@ build-js-xetex-toplevel.stamp: build-js-xetex-configured.stamp $(LIB_FONTCONFIG)
 	CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR) >> $(VERBOSE_LOG)
 	touch $@
 
+xetex_bc = $(XETEX_BUILD_DIR)texk/web2c/xetex
+xdvipdfmx_bc = $(XETEX_BUILD_DIR)texk/xdvipdfmx/src/xdvipdfmx
+
 # "Inject" native tools used in the compilation
-$(XETEX_BC): build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
+$(xetex_bc) $(xdvipdfmx_bc): xetex.stamp
+
+INTERMEDIATE: xetex.stamp
+xetex.stamp: build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
 	@echo '>>>' Building xetex...
 	if CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -k -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG); then \
 		echo '>>>' Done!; \
@@ -321,8 +330,7 @@ $(XETEX_BC): build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
 		EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG); \
 	fi
 	EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR)texk/web2c/ $(addprefix -o , $(NATIVE_WEB2C_TOOLS:$(NATIVE_BUILD_DIR)texk/web2c/%=%)) xetex >> $(VERBOSE_LOG)
-	test -s $@ && touch $@
-
+	touch $@
 
 # Manually perform the final link step. The exact objects to use are determined
 # from the last step of linking xetex. Doing it this way somehow avoids
@@ -334,9 +342,9 @@ xetex_libs_dir = $(XETEX_BUILD_DIR)libs/
 xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/libgraphite2.a icu/icu-build/lib/libicuuc.a icu/icu-build/lib/libicudata.a teckit/libTECkit.a poppler/libpoppler.a libpng/libpng.a)
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
-$(XETEX_JS): xetex.pre.js $(XETEX_BC)
+$(XETEX_JS): xetex.pre.js $(xetex_bc)
 #	em++ -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912
-	em++ -g -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912
+	em++ -g -O2 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
 
 $(XELATEX_JS): $(XETEX_JS)
 	ln -srf $< $@
@@ -347,9 +355,9 @@ $(XELATEX_EXE): $(XELATEX_JS)
 	cat $(XELATEX_JS) >> $@
 	chmod a+x $@
 
-xetex.worker.js: $(XETEX_BC) xetex.pre.worker.js xetex.post.worker.js
-#	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 xetex.bc -o $@
-	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s ASSERTIONS=2 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0 -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912
+$(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js xetex.post.worker.js
+	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
+#	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
 
 ###############################################################################
 # xelatex.fmt

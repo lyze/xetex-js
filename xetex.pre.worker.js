@@ -22,19 +22,19 @@
  * SOFTWARE.
  */
 var Module = {
-  thisProgram: './xelatex',
-  print: function(data) {
-    self.postMessage({channel: 'stdout', data: data});
+  'thisProgram': './xelatex',
+  'print': function(data) {
+    self.postMessage({'channel': 'stdout', 'data': data});
   },
-  printErr: function(data) {
-    self.postMessage({channel: 'stderr', data: data});
+  'printErr': function(data) {
+    self.postMessage({'channel': 'stderr', 'data': data});
   }
 };
 
 var xetexCore = function(Module) {
-  Module.preInit = function() {
+  Module['preInit'] = function() {
     try {
-      FS.createDataFile('.', Module.thisProgram, 'Dummy file for kpathsea.', true, true);
+      FS.createDataFile('.', Module['thisProgram'], 'Dummy file for kpathsea.', true, true);
     } catch (e) {
       if (e.errno === ERRNO_CODES.EEXIST) {
         return;

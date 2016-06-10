@@ -27,11 +27,30 @@
 };
 
 var FS;
+var runtimeInitializedCallbacks = [];
+
+/** @constructor */
+function InvocationError(message, table, receiver, data) {
+  Error.call(message);
+  this.table = table;
+  this.receiver = receiver;
+  this.data = data;
+};
+InvocationError.prototype = Object.create(Error.prototype);
+InvocationError.prototype.name = 'InvocationError';
+
+/** @constructor */
+function ExitStatusError(message, status) {
+  Error.call(message);
+  this.status = status;
+}
+ExitStatusError.prototype = Object.create(Error.prototype);
+ExitStatusError.prototype.name = 'InvocationError';
 
 var updateToNewModule = function() {
   if (Module.HEAPU8) {
     Module.HEAPU8.fill(0);  // avoids choking when assertions are enabled.
-    Module.calledRun = false; // hack
+    Module['calledRun'] = false; // hack
   }
   var m = xetexCore(Module);
   // update globals
@@ -39,10 +58,7 @@ var updateToNewModule = function() {
   FS = m[1];
 };
 
-
-var runtimeInitializedCallbacks = [];
-
-Module.onRuntimeInitialized = function () {
+Module['onRuntimeInitialized'] = function () {
   runtimeInitializedCallbacks.forEach(function (callback) {
     callback();
   });
@@ -54,20 +70,33 @@ var replyThroughPort = function(event, msg, altMsg) {
     return;
   }
   var replyPort = event.ports[0];
-  if (msg.error) {
+  if (msg['error']) {
     // Transform errors to allow structured cloning
-    var error = msg.error;
+    var error = msg['error'];
     if (FS && FS.ErrnoError && error instanceof FS.ErrnoError) {
-      msg.error = {
-        code: error.code,
-        errno: error.errno,
-        message: error.message,
-        stack: error.stack
+      msg['error'] = {
+        'code': error.code,
+        'errno': error.errno,
+        'message': error.message,
+        'stack': error.stack
+      };
+    } else if (error instanceof InvocationError) {
+      msg['error'] = {
+        'message': error.message,
+        'stack': error.stack,
+        'receiver': error.receiver.toString(),
+        'data': error.data
+      };
+    } else if (error instanceof ExitStatusError) {
+      msg['error'] = {
+        'message': error.message,
+        'stack': error.stack,
+        'status': error.status
       };
     } else if (error instanceof Error) {
-      msg.error = {
-        message: error.message,
-        stack: error.stack
+      msg['error'] = {
+        'message': error.message,
+        'stack': error.stack
       };
     }
   }
@@ -87,20 +116,20 @@ var execute = function(event, handler, message) {
   try {
     var retVal = handler(message);
     var ret = message.hasOwnProperty('ret') ? message['ret'] : retVal;
-    replyThroughPort(event, {ret: ret}, {ret: null});
+    replyThroughPort(event, {'ret': ret}, {'ret': null});
   } catch (e) {
     console.error(e);
-    replyThroughPort(event, {error: e}, {error: e.toString()});
+    replyThroughPort(event, {'error': e}, {'error': e.toString()});
   }
 };
 
 var executeAsync = function(event, asyncHandler, message) {
   asyncHandler(message).then(function(retVal) {
     var ret = message.hasOwnProperty('ret') ? message['ret'] : retVal;
-    replyThroughPort(event, {ret: ret}, {ret: null});
+    replyThroughPort(event, {'ret': ret}, {'ret': null});
   }, function(e) {
     console.error(e);
-    replyThroughPort(event, {error: e}, {error: e.toString()});
+    replyThroughPort(event, {'error': e}, {'error': e.toString()});
   });
 };
 
@@ -117,61 +146,86 @@ var handleReloadAsync = function () {
 
 var callMainAsync = function(data) {
   return new Promise(function(resolve, reject) {
-    Module.onExit = function(status) {
+    Module['onExit'] = function(status) {
       if (status === 0) {
         resolve(status);
       } else {
-        reject({
-          message: 'Program exited with a nonzero status code.',
-          status: status
-        });
+        throw new ExitStatusError('Program exited with a nonzero status code.',
+                                  status);
       }
     };
-    Module.callMain.apply(Module, data.arguments);
+    Module['callMain'].apply(Module, data['arguments']);
   });
 };
 
+var callFunction = function(table, receiver, data) {
+  var command = data['command'];
+  if (typeof table[command] !== 'function') {
+    throw new InvocationError(
+      'Bad message: ' + data['namespace'] + '.' + command +
+        ' is not a function',
+      table, receiver, data);
+  }
+  return table[command].apply(receiver, data['arguments']);
+};
+
 var handleModuleMessage = function(data) {
-  return Module[data.command].apply(Module, data.arguments);
+  return callFunction(Module, Module, data);
+};
+
+// This mapping allows function calls to the FS object when using the closure
+// compiler. The FS object does not export any of its symbols, so the function
+// names would be flattened otherwise. We declare only a small subset here. More
+// entries can be added if necessary.
+var fsFunctionTable = function(fs) {
+  return {
+    'createDataFile': fs.createDataFile,
+    'createDevice': fs.createDevice,
+    'createFolder': fs.createFolder,
+    'createLazyFile': fs.createLazyFile,
+    'createLink': fs.createLink,
+    'createPath': fs.createPath,
+    'mount': fs.mount,
+    'unlink': fs.unlink
+  };
 };
 
 var handleFSMessage = function(data) {
-  if (data.command === 'mount' && data.arguments && data.arguments.length > 0) {
-    switch (data.arguments[0]) {
+  if (data['command'] === 'mount' && data['arguments'] && data['arguments'].length > 0) {
+    switch (data['arguments'][0]) {
     case 'MEMFS':
-      data.arguments[0] = MEMFS;
+      data['arguments'][0] = MEMFS;
       break;
     case 'NODEFS':
-      data.arguments[0] = NODEFS;
+      data['arguments'][0] = NODEFS;
       break;
     case 'IDBFS':
-      data.arguments[0] = IDBFS;
+      data['arguments'][0] = IDBFS;
       break;
     case 'WORKERFS':
-      data.arguments[0] = WORKERFS;
+      data['arguments'][0] = WORKERFS;
       break;
     }
-    return FS[data.command].apply(FS, data.arguments);
   }
-  return FS[data.command].apply(FS, data.arguments);
+  return callFunction(fsFunctionTable(FS), FS, data);
 };
 
 self.onmessage = function(e) {
   var data = e.data;
   // Kludge to reload the module
   if (e.data === 'reload') {
-    // Recreate the module.
+    // Recreate the module
     executeAsync(e, handleReloadAsync, data);
     return;
   }
 
   // Kludge to get an exit status
-  if (data.namespace === 'Module' && data.command === 'callMain') {
+  if (data['namespace'] === 'Module' && data['command'] === 'callMain') {
     executeAsync(e, callMainAsync, data);
     return;
   }
   var handler;
-  switch (data.namespace) {
+  switch (data['namespace']) {
   case 'Module':
     handler = handleModuleMessage;
     break;
@@ -179,7 +233,9 @@ self.onmessage = function(e) {
     handler = handleFSMessage;
     break;
   default:
-    throw new Error('Unknown namespace: ' + e.namespace);
+    replyThroughPort(e, {
+      'error': new Error('Unknown namespace: ' + data['namespace'])
+    });
   }
   execute(e, handler, data);
 };
