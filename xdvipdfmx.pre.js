@@ -1,5 +1,5 @@
 /**
- * Preamble to xetex.js.
+ * Preamble to xdvipdfmx.js.
  *
  * @license Copyright David Xu, 2016
  *
@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-/* global ENV, ENVIRONMENT_IS_NODE, FS, NODEFS */
+/* global ENV, ENVIRONMENT_IS_NODE, FS, NODEFS, process */
 var Module = {
-  'thisProgram': 'cwd/xelatex',
+  'thisProgram': 'cwd/xdvipdfmx',
   'preInit': function() {
     if (ENVIRONMENT_IS_NODE) {
       FS.mkdir('cwd');
@@ -32,6 +32,9 @@ var Module = {
   },
   'preRun': function() {
     if (ENVIRONMENT_IS_NODE) {
+      if (process.env['KPATHSEA_DEBUG']) {
+        ENV['KPATHSEA_DEBUG'] = process.env['KPATHSEA_DEBUG'];
+      }
       ENV['TEXMFDIST'] = '{cwd,cwd/texlive,cwd/texlive-basic,cwd/texlive-full}/texmf-dist';
       ENV['TEXMFCNF'] = 'cwd:$TEXMFDIST/web2c:';
       ENV['TEXINPUTS'] = 'cwd:';

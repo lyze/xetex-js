@@ -168,6 +168,10 @@ all: $(XETEX_JS) $(XELATEX_JS) $(XELATEX_EXE) $(XETEX_WORKER_JS) $(XDVIPDFMX_EXE
 .PHONY: texlive-manifest
 texlive-manifest: texlive.lst
 
+.PHONY: clean-js-artifacts-only
+clean-js-artifacts-only:
+	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem $(XETEX_WORKER_JS) $(XETEX_WORKER_JS).mem $(XDVIPDFMX_EXE) $(XDVIPDFMX_JS) $(XDVIPDFMX_JS).mem $(XDVIPDFMX_WORKER_JS) $(XDVIPDFMX_WORKER_JS).mem
+
 .PHONY: confirm-clean
 confirm-clean:
 	@while :; do							\
@@ -346,9 +350,20 @@ xetex_libs_dir = $(XETEX_BUILD_DIR)libs/
 xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/libgraphite2.a icu/icu-build/lib/libicuuc.a icu/icu-build/lib/libicudata.a teckit/libTECkit.a poppler/libpoppler.a libpng/libpng.a)
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
+# TODO: Using --closure 1 with -O2 or higher breaks xetex.js and xdvipdfmx.js
+#
+# Status | Flags
+# -------|------
+# OK     | -O2 --closure 1 --js-opts 0
+# OK     | -O2
+# OK     | -O3
+# OK     | --closure 1
+# BAD    | -O2 --closure 1
+# BAD    | -O3 --closure 1
+
 $(XETEX_JS): xetex.pre.js $(xetex_bc)
-#	em++ -O2 --closure 1 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912
-	em++ -g -O2 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+	em++ -O2 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
+#	em++ -g -O2 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
 
 $(XELATEX_JS): $(XETEX_JS)
 	ln -srf $< $@
@@ -360,15 +375,16 @@ $(XELATEX_EXE): $(XELATEX_JS)
 	chmod a+x $@
 
 $(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js xetex.post.worker.js
-	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
-#	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+#	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
+	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
 
 
 xdvipdfmx.bc: $(xdvipdfmx_bc)
 	ln -srf $< $@
 
 $(XDVIPDFMX_JS): xdvipdfmx.bc xdvipdfmx.pre.js
-	emcc -g -O2 --closure 1 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+	emcc -O2 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[]
+#	emcc -g -O2 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
 
 $(XDVIPDFMX_WORKER_JS): $(xdvipdfmx_bc) xdvipdfmx.pre.worker.js xdvipdfmx.post.worker.js
 	emcc -O2 --closure 1 --pre-js xdvipdfmx.pre.worker.js --post-js xdvipdfmx.post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[]

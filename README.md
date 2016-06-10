@@ -21,17 +21,18 @@ since the generated artifacts are checked in.
 An internet connection is required.
 
 1.  [Install Emscripten.](https://kripken.github.io/emscripten-site/)
-2.  Run `make`.
+2.  Run `make 2>&1 | tee log.txt`. There will be a lot of output.
 
-Artifacts:
+### Artifacts
 
 *   `xetex.js` module for a JavaScript engine.
 *   `xelatex.js` same module as `xetex.js` except with a different name.
-*   `xelatex` executable. Runs with `#!/usr/bin/env node`.
+*   `xelatex` executable. Runs with `#!/usr/bin/env node`. Produces `.xdv`
+    output.
 *   `xdvipdfmx.js` module for a Javascript engine.
-*   `xdvipdfmx` executable. **Not yet Emscriptified.** Runs with `#!/usr/bin/env node`.
-    This is the required backend to produce PDF output from `xelatex`. Note that
-    this should live next to `xelatex`.
+*   `xdvipdfmx` executable. Runs with `#!/usr/bin/env node`. This is the
+    required backend to produce PDF output from `xelatex`. You must run this to
+    produce `.pdf` from `.xdv`.
 *   `xetex.worker.js`compiled JavaScript file that ought to be loaded into a
     browser as a
     [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API).
@@ -66,6 +67,12 @@ Note: The example doesn't do anything interesting yet!
 
 ## Known limitations
 
+_Em_-`xelatex` requires a separate pass to convert XDV output into PDF output,
+whereas in the native version of `xelatex`, the backend driver is automatically
+invoked to produce PDF output. This limitation is due to the fact that the
+system calls [`pipe`](https://github.com/kripken/emscripten/pull/4378),
+`fork`/`clone`, and `execve` are not implemented in Emscripten.
+
 It is not feasible to execute the main function multiple times because there are
 memory leaks. The easiest (and best) way to run the program multiple times with
 a clean state is to create a new instance every time.
@@ -82,6 +89,8 @@ If you use
 [Emscripten's `MEMFS`](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html#memfs)
 and you need to run the program multiple times, you will have to reconstruct the
 filesystem for each new instance.
+
+
 
 
 ## Port notes
@@ -134,7 +143,7 @@ FS.createDataFile('/', Module.thisProgram, 'Dummy file for kpathsea.', true, tru
 This is what `xetex.pre.worker.js` does.
 
 When using the executable file in a terminal-like environment, we can make our
-Em-XeTeX behave more closely to native XeTeX. One major limitation is that
+_Em_-XeTeX behave more closely to native XeTeX. One major limitation is that
 [the root directory of the native filesystem cannot be mounted as the root of the virtual filesystem](https://github.com/kripken/emscripten/issues/2040).
 This is addressed by mounting the (native) current working directory in the
 virtual directory `/cwd`. The file [xetex.pre.js](xetex.pre.js) employs some
