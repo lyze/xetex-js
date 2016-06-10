@@ -44,11 +44,14 @@ ifeq ($(JS_CONFIG_SITE_ABS),)
 $(error Cannot find JS_CONFIG_SITE: $(JS_CONFIG_SITE))
 endif
 
+XETEX_BUILD_DIR = $(EMSCRIPTEN_BUILD_DIR)build-xetex/
 XETEX_JS = xetex.js
 XELATEX_JS = xelatex.js
 XELATEX_EXE = xelatex
-XETEX_BUILD_DIR = $(EMSCRIPTEN_BUILD_DIR)build-xetex/
 XETEX_WORKER_JS = xetex.worker.js
+XDVIPDFMX_EXE = xdvipdfmx
+XDVIPDFMX_JS = xdvipdfmx.js
+XDVIPDFMX_WORKER_JS = xdvipdfmx.worker.js
 
 XETEX_ARCHIVE = xetex-0.9999.3.tar.bz2
 XETEX_SOURCE_DIR = $(SOURCES_DIR)xetex-0.9999.3/
@@ -160,7 +163,7 @@ endif
 
 
 .PHONY: all
-all: $(XETEX_JS) $(XELATEX_JS) $(XELATEX_EXE) $(XETEX_WORKER_JS) xelatex.fmt texlive.lst xdvipdfmx
+all: $(XETEX_JS) $(XELATEX_JS) $(XELATEX_EXE) $(XETEX_WORKER_JS) $(XDVIPDFMX_EXE) $(XDVIPDFMX_JS) $(XDVIPDFMX_WORKER_JS) xelatex.fmt texlive.lst
 
 .PHONY: texlive-manifest
 texlive-manifest: texlive.lst
@@ -188,7 +191,7 @@ confirm-clean:
 clean-js: confirm-clean
 	rm -rf $(EMSCRIPTEN_BUILD_DIR)
 	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
-	rm -f $(XETEX_JS) $(XETEX_JS).mem xdvipdfmx.worker.js xdvipdfmx.worker.js.mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem $(XETEX_WORKER_JS) $(XETEX_WORKER_JS).mem
+	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem $(XETEX_WORKER_JS) $(XETEX_WORKER_JS).mem $(XDVIPDFMX_EXE) $(XDVIPDFMX_JS) $(XDVIPDFMX_JS).mem $(XDVIPDFMX_WORKER_JS) $(XDVIPDFMX_WORKER_JS).mem
 	rm -f $(VERBOSE_LOG)
 
 .PHONY: clean
@@ -204,6 +207,7 @@ distclean: clean
 	rm -f $(INSTALL_TL_UNX_ARCHIVE)
 	rm -f $(EXPAT_ARCHIVE) $(FONTCONFIG_ARCHIVE)
 	rm -f $(XETEX_ARCHIVE)
+
 
 $(SOURCES_DIR):
 	mkdir -p $@
@@ -288,6 +292,7 @@ $(LIB_FREETYPE): build-js-xetex-configured.stamp $(NATIVE_BUILD_DIR)libs/freetyp
 	fi
 	test -s $@ && touch $@
 
+
 ###############################################################################
 # XeTeX and xdvipdfmx
 ###############################################################################
@@ -311,7 +316,6 @@ xdvipdfmx_bc = $(XETEX_BUILD_DIR)texk/xdvipdfmx/src/xdvipdfmx
 
 # "Inject" native tools used in the compilation
 $(xetex_bc) $(xdvipdfmx_bc): xetex.stamp
-
 INTERMEDIATE: xetex.stamp
 xetex.stamp: build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
 	@echo '>>>' Building xetex...
@@ -352,12 +356,29 @@ $(XELATEX_JS): $(XETEX_JS)
 .DELETE_ON_ERROR: $(XETEX_EXE)
 $(XELATEX_EXE): $(XELATEX_JS)
 	echo '#!/usr/bin/env node' > $@
-	cat $(XELATEX_JS) >> $@
+	cat $< >> $@
 	chmod a+x $@
 
 $(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js xetex.post.worker.js
 	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
 #	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+
+
+xdvipdfmx.bc: $(xdvipdfmx_bc)
+	ln -srf $< $@
+
+$(XDVIPDFMX_JS): xdvipdfmx.bc xdvipdfmx.pre.js
+	emcc -g -O2 --closure 1 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+
+$(XDVIPDFMX_WORKER_JS): $(xdvipdfmx_bc) xdvipdfmx.pre.worker.js xdvipdfmx.post.worker.js
+	emcc -O2 --closure 1 --pre-js xdvipdfmx.pre.worker.js --post-js xdvipdfmx.post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[]
+
+.DELETE_ON_ERROR: $(XDVIPDFMX_EXE)
+$(XDVIPDFMX_EXE): $(XDVIPDFMX_JS)
+	echo '#!/usr/bin/env node' > $@
+	cat $< >> $@
+	chmod a+x $@
+
 
 ###############################################################################
 # xelatex.fmt
