@@ -31,7 +31,7 @@ var runtimeInitializedCallbacks = [];
 
 /** @constructor */
 function InvocationError(message, table, receiver, data) {
-  Error.call(message);
+  Error.call(this, message);
   this.table = table;
   this.receiver = receiver;
   this.data = data;
@@ -52,7 +52,7 @@ var updateToNewModule = function() {
     Module.HEAPU8.fill(0);  // avoids choking when assertions are enabled.
     Module['calledRun'] = false; // hack
   }
-  var m = xetexCore(Module);
+  var m = createModule(Module);
   // update globals
   Module = m[0];
   FS = m[1];
@@ -65,10 +65,11 @@ Module['onRuntimeInitialized'] = function () {
   runtimeInitializedCallbacks = [];
 };
 
-var replyThroughPort = function(event, msg, altMsg) {
+var replyThroughPort = function(event, msg, altMsg, transferList) {
   if (event.ports.length === 0) {
     return;
   }
+  msg['request'] = event.data;
   var replyPort = event.ports[0];
   if (msg['error']) {
     // Transform errors to allow structured cloning
@@ -82,6 +83,7 @@ var replyThroughPort = function(event, msg, altMsg) {
       };
     } else if (error instanceof InvocationError) {
       msg['error'] = {
+        'name': error.name,
         'message': error.message,
         'stack': error.stack,
         'receiver': error.receiver.toString(),
@@ -89,19 +91,21 @@ var replyThroughPort = function(event, msg, altMsg) {
       };
     } else if (error instanceof ExitStatusError) {
       msg['error'] = {
+        'name': error.name,
         'message': error.message,
         'stack': error.stack,
         'status': error.status
       };
     } else if (error instanceof Error) {
       msg['error'] = {
+        'name': error.name,
         'message': error.message,
         'stack': error.stack
       };
     }
   }
   try {
-    replyPort.postMessage(msg);
+    replyPort.postMessage(msg, transferList);
   } catch (e) {
     if (e instanceof DOMException && e.code === DOMException.DATA_CLONE_ERR) {
       console.warn(e, msg);
@@ -116,9 +120,10 @@ var execute = function(event, handler, message) {
   try {
     var retVal = handler(message);
     var ret = message.hasOwnProperty('ret') ? message['ret'] : retVal;
-    replyThroughPort(event, {'ret': ret}, {'ret': null});
+    var transferList = message.hasOwnProperty('retTransfer') && message['retTransfer'] ? [ret] : undefined;
+    replyThroughPort(event, {'ret': ret}, {'ret': null}, transferList);
   } catch (e) {
-    console.error(e);
+    console.error(event.data, e);
     replyThroughPort(event, {'error': e}, {'error': e.toString()});
   }
 };
@@ -126,9 +131,10 @@ var execute = function(event, handler, message) {
 var executeAsync = function(event, asyncHandler, message) {
   asyncHandler(message).then(function(retVal) {
     var ret = message.hasOwnProperty('ret') ? message['ret'] : retVal;
-    replyThroughPort(event, {'ret': ret}, {'ret': null});
+    var transferList = message.hasOwnProperty('retTransfer') && message['retTransfer'] ? [ret] : undefined;
+    replyThroughPort(event, {'ret': ret}, {'ret': null}, transferList);
   }, function(e) {
-    console.error(e);
+    console.error(event.data, e);
     replyThroughPort(event, {'error': e}, {'error': e.toString()});
   });
 };
@@ -171,23 +177,6 @@ var callFunction = function(table, receiver, data) {
 
 var handleModuleMessage = function(data) {
   return callFunction(Module, Module, data);
-};
-
-// This mapping allows function calls to the FS object when using the closure
-// compiler. The FS object does not export any of its symbols, so the function
-// names would be flattened otherwise. We declare only a small subset here. More
-// entries can be added if necessary.
-var fsFunctionTable = function(fs) {
-  return {
-    'createDataFile': fs.createDataFile,
-    'createDevice': fs.createDevice,
-    'createFolder': fs.createFolder,
-    'createLazyFile': fs.createLazyFile,
-    'createLink': fs.createLink,
-    'createPath': fs.createPath,
-    'mount': fs.mount,
-    'unlink': fs.unlink
-  };
 };
 
 var handleFSMessage = function(data) {

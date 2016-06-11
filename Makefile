@@ -350,7 +350,7 @@ xetex_libs_dir = $(XETEX_BUILD_DIR)libs/
 xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/libgraphite2.a icu/icu-build/lib/libicuuc.a icu/icu-build/lib/libicudata.a teckit/libTECkit.a poppler/libpoppler.a libpng/libpng.a)
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
-# TODO: Using --closure 1 with -O2 or higher breaks xetex.js and xdvipdfmx.js
+# TODO: Using --closure 1 with -O2 or higher breaks xetex.js and xdvipdfmx.js. Maybe we can run closure compiler manually.
 #
 # Status | Flags
 # -------|------
@@ -376,7 +376,7 @@ $(XELATEX_EXE): $(XELATEX_JS)
 
 $(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js xetex.post.worker.js
 #	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
-	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s ALIASING_FUNCTION_POINTERS=0
 
 
 xdvipdfmx.bc: $(xdvipdfmx_bc)
@@ -446,8 +446,7 @@ $(INSTALL_TL_UNX_ARCHIVE):
 # This part can be easily customized to your liking.
 .DELETE_ON_ERROR: texlive.lst
 texlive.lst: texlive-basic.stamp
-	find texlive-basic -type d -exec echo -e {}/ \; > $@
-	find texlive-basic/ -type f -exec echo {} \; >> $@
+	cd texlive-basic && find * -type f -exec echo {} texlive-basic/{} \; >> $$OLDPWD/$@
 
 texlive-basic.stamp: $(INSTALL_TL_UNX_ARCHIVE)
 	mkdir -p texlive-basic/

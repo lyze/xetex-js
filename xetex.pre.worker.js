@@ -31,7 +31,25 @@ var Module = {
   }
 };
 
-var xetexCore = function(Module) {
+// This mapping allows function calls to the FS object when using the closure
+// compiler. The FS object does not export any of its symbols, so the function
+// names would be flattened otherwise. We declare only a small subset here. More
+// entries can be added if necessary.
+var fsFunctionTable = function(fs) {
+  return {
+    'createDataFile': fs.createDataFile,
+    'createDevice': fs.createDevice,
+    'createFolder': fs.createFolder,
+    'createLazyFile': fs.createLazyFile,
+    'createPath': fs.createPath,
+    'mount': fs.mount,
+    'readFile': fs.readFile,
+    'symlink': fs.symlink,
+    'unlink': fs.unlink
+  };
+};
+
+var createModule = function(Module) {
   Module['preInit'] = function() {
     try {
       FS.createDataFile('.', Module['thisProgram'], 'Dummy file for kpathsea.', true, true);

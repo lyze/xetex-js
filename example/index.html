@@ -1,134 +1,27 @@
 <html>
   <head>
-    <script src="../xetexcontroller.umd.js"></script>
+    <script src="../workercontroller.umd.js"></script>
     <script>
-      /* global xetexcontroller */
+      /* global workercontroller */
+      var controller = new workercontroller.XeLaTeXController(
+        '../xetex.worker.js');
+      controller.xelatexFmtUrl = '../xelatex.fmt';
+      controller.texLiveManifestUrl = '../texlive.lst';
+
       // Setup virtual filesystem and return a promise. We need to call this
       // function every time the xetex image reloads, since the filesystem
       // defaults to an in-memory filesystem with no persistence.
-      var prepareForNextCompilation = function(controller) {
-        console.log('Reloading xetex...');
-        return controller.reload().then(function() {
-          console.log('Setting up virtual in-memory filesystem environment...');
-
-          // Create the TeX memory dump in the filesystem.
-          controller.sendMessage({
-            namespace: 'FS', command: 'createLazyFile',
-            arguments: ['/', 'xelatex.fmt', '../xelatex.fmt', true, false],
-            ret: null
-          });
-
-          // We will mount TeX Live in texlive-basic/, so set up some overrides.
-          // Remember that earlier definitions override later ones in the kpathsea
-          // search path.
-          controller.sendMessage({
-            namespace: 'FS', command: 'createDataFile',
-            arguments: [
-              '/', 'texmf.cnf',
-              'TEXMFDIST = /texlive-basic/texmf-dist\n' +
-              'TEXMFLOCAL = /texlive-basic/texmf-local\n' +
-              'TEXMFCONFIG = /texlive-basic/texmf-config\n' +
-              'TEXMF = {!!$TEXMFDIST,!!$TEXMFLOCAL,!!$TEXMFCONFIG}\n',
-              true, false],
-            ret: null
-          });
-
-          // Make the provided web2c/texmf.cnf available on the kpathsea search
-          // path. The location of this file needs to come after our custom
-          // texmf.cnf in the search order.
-          controller.sendMessage({
-            namespace: 'FS', command: 'createPath',
-            arguments: ['/', 'share/texmf-dist/web2c/', true, true],
-            ret: null
-          });
-          controller.sendMessage({
-            namespace: 'FS', command: 'createLazyFile',
-            arguments: ['/share/texmf-dist/web2c/', 'texmf.cnf',
-                        '../texlive-basic/texmf-dist/web2c/texmf.cnf',
-                        true, false],
-            ret: null
-          });
-
-          var texLiveLoaded = new Promise(function(resolve, reject) {
-            var prepareTeXLiveFromManifest = function(response) {
-              // Each line is a relative path. Directories listed first, then files.
-              var lines = response.split('\n');
-              var commands = [];
-              var numDirectories = 0;
-              var numFiles = 0;
-              lines.forEach(function(path) {
-                var lastSlash = path.lastIndexOf('/');
-                if (lastSlash === path.length - 1) { // trailing slash?
-                  // create directory
-                  commands.push(controller.sendMessage({
-                    namespace: 'FS', command: 'createPath',
-                    arguments: ['/', path, true, true],
-                    ret: null
-                  }).then(function() {
-                    numDirectories++;
-                  }, reject));
-                } else {
-                  // Directory already created.
-                  var dirname = path.slice(0, lastSlash);
-                  var filename = path.slice(lastSlash + 1);
-                  commands.push(controller.sendMessage({
-                    namespace: 'FS', command: 'createLazyFile',
-                    arguments: ['/' + dirname, filename, '../' + path, true, false],
-                    ret: null
-                  }).then(function() {
-                    numFiles++;
-                  }, reject));
-                }
-              });
-              resolve(Promise.all(commands).then(function() {
-                return {numDirectories: numDirectories, numFiles: numFiles};
-              }));
-            };
-
-            var manifestXhr = new XMLHttpRequest();
-            manifestXhr.open('GET', '../texlive.lst');
-            manifestXhr.onreadystatechange = function() {
-              if (this.readyState === XMLHttpRequest.DONE) {
-                if (this.status === 200) {
-                  prepareTeXLiveFromManifest(this.response);
-                } else {
-                  console.error('Cannot retrieve manifest file.', this);
-                  reject();
-                }
-              }
-            };
-            manifestXhr.send();
-          });
-
-          return texLiveLoaded.then(function(stats) {
-            console.log('TeX Live creation stats', stats);
-            console.log('Created in-memory virtual filesystem environment.');
-          }, function(e) {
-            console.error(e);
-          });
+      var doReload = function() {
+        console.log('Reloading...');
+        return controller.reload().then(stats => {
+          console.log('Loaded.', stats);
         });
       };
 
       // Prepare the FS either when the program is ready again or when the user
       // requests compile
       var autoReload = false;
-      var reloaded; // avoid preparing the FS multiple times
-      var controller = new xetexcontroller.XeTeXController(
-        '../xetex.worker.js', function(e) {
-          var response = e.data;
-          switch (response.channel) {
-            case 'stdout':
-              console.log(response.data);
-              break;
-
-            case 'stderr':
-              console.warn(response.data);
-              break;
-
-            default:
-              console.error('Unknown channel: ' + response.channel);
-          }
-        });
+      var reloaded = doReload();
 
       document.addEventListener('DOMContentLoaded', function() {
         var autoReloadCheckbox = document.getElementById('auto-reload');
@@ -142,17 +35,13 @@
           e.preventDefault();
           var doCompile = function() {
             console.log('Performing compilation...');
-            controller.sendMessage({
-              namespace: 'FS', command: 'createDataFile',
-              arguments: ['/', 'source.tex', sourceTextArea.value, true, true],
-              // Since the result of createDataFile can't be cloned (and thus
-              // cannot be passed back from the worker), make this our return value
-              ret: null
-            }).then(function(result) {
-              console.log('source textarea: FS.createDataFile', result);
-            }, function(error) {
-              console.log('source textarea: FS.createDataFile', error);
-            });
+            controller.createDataFile('/', 'source.tex', sourceTextArea.value,
+                                      false, true)
+                      .then(function(result) {
+                        console.log('source textarea: FS.createDataFile', result);
+                      }, function(error) {
+                        console.log('source textarea: FS.createDataFile', error);
+                      });
             controller.sendMessage({
               namespace: 'Module', command: 'callMain',
               // uncomment below to debug kpathsea search paths
@@ -164,14 +53,14 @@
               console.error('compile: Module.callMain', error);
             }).then(function() {
               if (autoReload) {
-                reloaded = prepareForNextCompilation(controller);
+                reloaded = doReload();
               } else {
                 reloaded = null;
               }
             });
           };
           if (!reloaded) {
-            reloaded = prepareForNextCompilation(controller);
+            reloaded = doReload();
           }
           reloaded.then(doCompile);
         });

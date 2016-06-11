@@ -42,9 +42,9 @@ An internet connection is required.
         [Module](https://kripken.github.io/emscripten-site/docs/api_reference/module.html)
         and
         [FS API](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html)s
-        from `xetexcontroller.js`.
-*   `xetexcontroller.js` ES6 browser module to interact with `xetex.worker.js`.
-*   `xetexcontroller.umd.js` UMD browser module to interact with `xetex.worker.js`.
+        from a `WorkerController`.
+*   `workercontroller.js` ES6 browser module to interact with `xetex.worker.js`.
+*   `workercontroller.umd.js` UMD browser module to interact with `xetex.worker.js`.
 *   `xetex/xelatex.fmt` TeX memory dump that needs to be available in order to
     compile garden-variety LaTeX documents.
 *   `texlive.lst` manifest file that lists all of the usable files in the TeX

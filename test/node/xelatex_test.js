@@ -1,24 +1,24 @@
 /* global __dirname, process */
-import { execFile, execFileSync } from 'child_process';
+import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 import test from 'blue-tape';
 
-const PROJECT_ROOT = path.join(__dirname, '..');
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const PATH_TO_XELATEX = path.join(PROJECT_ROOT, 'xelatex.js');
 const PATH_TO_XDVIPDFMX = path.join(PROJECT_ROOT, 'xdvipdfmx.js');
 
 const DEFAULT_ENV = {
-  cwd: path.join(__dirname, '..')
+  cwd: path.join(__dirname, '..', '..')
 };
 
 // Returns the path on the filesystem to a sample tex file.
 const actualPath = filename => {
   if (filename) {
-    return path.join(__dirname, 'samples', filename);
+    return path.join(PROJECT_ROOT, 'test', 'samples', filename);
   }
-  return path.join(__dirname, 'samples');
+  return path.join(PROJECT_ROOT, 'test', 'samples');
 };
 
 // Returns a path usable by the virtual xelatex filesystem for a sample tex
@@ -60,7 +60,8 @@ test('xelatex has a version', t => {
 
 test('xelatex can start up', t => {
   return xelatex().then(_ => {
-    t.fail('xelatex should have a nonzero status code if neither arguments nor standard input are given.');
+    t.fail('xelatex should have a nonzero status code ' +
+           'if neither arguments nor standard input are given.');
   }, ([e, stdout, stderr]) => {
     if (stdout.startsWith('This is XeTeX')) {
       t.pass('has a version string');
@@ -94,7 +95,7 @@ const ensureFileDoesNotExist = (t, file) => new Promise((resolve, reject) => {
   });
 });
 
-const checkNonEmptyContent = (t, filename) => new Promise((resolve, reject) => {
+const assertNonEmptyContentAsync = (t, filename) => new Promise((resolve, reject) => {
   fs.readFile(filename, (e, data) => {
     t.error(e, `${filename} should exist`);
     t.ok(data, `${filename} should have some content`);
@@ -119,13 +120,13 @@ test('xelatex can compile hello_world.tex', t => {
     .then(_ => xelatex([
       '-no-pdf', `-output-directory=${virtualOutputDir}`, virtualTex
     ]))
-    .then(_ => checkNonEmptyContent(t, outputXdv))
+    .then(_ => assertNonEmptyContentAsync(t, outputXdv))
 
     .then(_ => {
       t.test('xdvipdfmx can convert hello_world.xdv to PDF', tt => {
         return ensureFileDoesNotExist(t, outputPdf)
           .then(_ => xdvipdfmx(['-o', virtualPdf, virtualXdv]))
-          .then(_ => checkNonEmptyContent(tt, outputPdf));
+          .then(_ => assertNonEmptyContentAsync(tt, outputPdf));
       });
     });
 });
