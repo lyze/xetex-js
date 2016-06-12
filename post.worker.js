@@ -40,12 +40,22 @@ InvocationError.prototype = Object.create(Error.prototype);
 InvocationError.prototype.name = 'InvocationError';
 
 /** @constructor */
+function ReplyFailedError(cause, request, reply) {
+  Error.call(this, cause);
+  this.cause = cause;
+  this.request = request;
+  this.reply = reply;
+}
+ReplyFailedError.prototype = Object.create(Error.prototype);
+ReplyFailedError.prototype.name = 'ReplyFailedError';
+
+/** @constructor */
 function ExitStatusError(message, status) {
-  Error.call(message);
+  Error.call(this, message);
   this.status = status;
 }
 ExitStatusError.prototype = Object.create(Error.prototype);
-ExitStatusError.prototype.name = 'InvocationError';
+ExitStatusError.prototype.name = 'ExitStatusError';
 
 var updateToNewModule = function() {
   if (Module.HEAPU8) {
@@ -111,16 +121,26 @@ var replyThroughPort = function(event, msg, altMsg, transferList) {
       console.warn(e, msg);
       replyPort.postMessage(altMsg);
     } else {
-      throw e;
+      throw new ReplyFailedError(e, event.data, msg);
     }
   }
+};
+
+var TYPED_ARRAY_PROTOTYPE = Object.getPrototypeOf(Uint8Array);
+
+var getTransferList = function(value) {
+  // Everything that has a buffer property in the Emscripten API is a TypedArray
+  if (value instanceof TYPED_ARRAY_PROTOTYPE) {
+    return [value.buffer];
+  }
+  return [];
 };
 
 var execute = function(event, handler, message) {
   try {
     var retVal = handler(message);
     var ret = message.hasOwnProperty('ret') ? message['ret'] : retVal;
-    var transferList = message.hasOwnProperty('retTransfer') && message['retTransfer'] ? [ret] : undefined;
+    var transferList = message['retTransfer'] ? getTransferList(ret) : [];
     replyThroughPort(event, {'ret': ret}, {'ret': null}, transferList);
   } catch (e) {
     console.error(event.data, e);
@@ -131,8 +151,13 @@ var execute = function(event, handler, message) {
 var executeAsync = function(event, asyncHandler, message) {
   asyncHandler(message).then(function(retVal) {
     var ret = message.hasOwnProperty('ret') ? message['ret'] : retVal;
-    var transferList = message.hasOwnProperty('retTransfer') && message['retTransfer'] ? [ret] : undefined;
-    replyThroughPort(event, {'ret': ret}, {'ret': null}, transferList);
+    var transferList = message['retTransfer'] ? getTransferList(ret) : [];
+    try {
+      replyThroughPort(event, {'ret': ret}, {'ret': null}, transferList);
+    } catch (e) {
+      console.error(event.data, e);
+      replyThroughPort(event, {'error': e}, {'error': e.toString()});
+    }
   }, function(e) {
     console.error(event.data, e);
     replyThroughPort(event, {'error': e}, {'error': e.toString()});

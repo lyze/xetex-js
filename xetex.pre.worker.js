@@ -1,7 +1,14 @@
 /**
- * Preamble to xetex.worker.js.
+ * Preamble to xdvipdfmx.worker.js.
  *
- * @license Copyright David Xu, 2016
+ * @license The preamble and postamble are copyright (c) 2016 by David Xu.
+ *
+ * The rest of this file is a derivative work of the XeTeX system that is
+ * Copyright (c) 1994-2008 by SIL International
+ * Copyright (c) 2009-2012 by Jonathan Kew
+ * Copyright (c) 2010-2012 by Han The Thanh
+ * Copyright (c) 2012-2015 by Khaled Hosny
+ * Copyright (c) 2012-2013 by Jiang Jiang
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal

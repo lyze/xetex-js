@@ -235,7 +235,7 @@ $(EXPAT_SOURCE_DIR)configure: $(EXPAT_ARCHIVE) | $(SOURCES_DIR)
 
 $(LIB_EXPAT): $(EXPAT_SOURCE_DIR)configure
 	mkdir -p $(EXPAT_BUILD_DIR)
-	cd $(EXPAT_BUILD_DIR) && emconfigure $$OLDPWD/$(EXPAT_SOURCE_DIR)configure CFLAGS=-Wno-error=implicit-function-declaration >> $(VERBOSE_LOG)
+	cd $(EXPAT_BUILD_DIR) && emconfigure $$OLDPWD/$(EXPAT_SOURCE_DIR)configure CFLAGS='-O3 -Wno-error=implicit-function-declaration' >> $(VERBOSE_LOG)
 	emmake $(MAKE) -C $(EXPAT_BUILD_DIR) >> $(VERBOSE_LOG)
 	test -s $@ && touch $@
 
@@ -252,7 +252,7 @@ $(FONTCONFIG_SOURCE_DIR)configure: $(FONTCONFIG_ARCHIVE) | $(SOURCES_DIR)
 # specified the JavaScript version of fontconfig in the top-most configuration.
 $(LIB_FONTCONFIG): $(FONTCONFIG_SOURCE_DIR)configure $(LIB_EXPAT) $(LIB_FREETYPE)
 	mkdir -p $(FONTCONFIG_BUILD_DIR)
-	cd $(FONTCONFIG_BUILD_DIR) && EMCONFIGURE_JS=2 CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static FREETYPE_CFLAGS="-I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/ -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS=-I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/ >> $(VERBOSE_LOG)
+	cd $(FONTCONFIG_BUILD_DIR) && EMCONFIGURE_JS=2 CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static FREETYPE_CFLAGS="-O3 -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/ -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS="-O3 -I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/" LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/ >> $(VERBOSE_LOG)
 	emmake $(MAKE) -C $(FONTCONFIG_BUILD_DIR) >> $(VERBOSE_LOG)
 	test -s $@ && touch $@
 
@@ -307,7 +307,7 @@ $(LIB_FREETYPE): build-js-xetex-configured.stamp $(NATIVE_BUILD_DIR)libs/freetyp
 build-js-xetex-configured.stamp: $(XETEX_SOURCE_DIR)build.sh
 	@echo '>>>' Configuring xetex...
 	mkdir -p $(XETEX_BUILD_DIR)
-	cd $(XETEX_BUILD_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS='-Wno-error=implicit-function-declaration -DELIDE_CODE' >> $(VERBOSE_LOG)
+	cd $(XETEX_BUILD_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS='-O3 -Wno-error=implicit-function-declaration -DELIDE_CODE' >> $(VERBOSE_LOG)
 	touch $@
 
 build-js-xetex-toplevel.stamp: build-js-xetex-configured.stamp $(LIB_FONTCONFIG)
@@ -362,8 +362,8 @@ xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xete
 # BAD    | -O3 --closure 1
 
 $(XETEX_JS): xetex.pre.js $(xetex_bc)
-	em++ -O2 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
-#	em++ -g -O2 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+	em++ -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
+#	em++ -g -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
 
 $(XELATEX_JS): $(XETEX_JS)
 	ln -srf $< $@
@@ -374,20 +374,20 @@ $(XELATEX_EXE): $(XELATEX_JS)
 	cat $< >> $@
 	chmod a+x $@
 
-$(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js xetex.post.worker.js
-#	emcc -O2 --closure 1 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
-	emcc -g -O2 --pre-js xetex.pre.worker.js --post-js xetex.post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s ALIASING_FUNCTION_POINTERS=0
+$(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js post.worker.js
+#	emcc -O3 --closure 1 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
+	emcc -g -O3 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s ALIASING_FUNCTION_POINTERS=0
 
 
 xdvipdfmx.bc: $(xdvipdfmx_bc)
 	ln -srf $< $@
 
 $(XDVIPDFMX_JS): xdvipdfmx.bc xdvipdfmx.pre.js
-	emcc -O2 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[]
+	emcc -O3 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[]
 #	emcc -g -O2 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
 
-$(XDVIPDFMX_WORKER_JS): $(xdvipdfmx_bc) xdvipdfmx.pre.worker.js xdvipdfmx.post.worker.js
-	emcc -O2 --closure 1 --pre-js xdvipdfmx.pre.worker.js --post-js xdvipdfmx.post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[]
+$(XDVIPDFMX_WORKER_JS): xdvipdfmx.bc xdvipdfmx.pre.worker.js post.worker.js
+	emcc -O3 --closure 1 --pre-js xdvipdfmx.pre.worker.js --post-js post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[]
 
 .DELETE_ON_ERROR: $(XDVIPDFMX_EXE)
 $(XDVIPDFMX_EXE): $(XDVIPDFMX_JS)

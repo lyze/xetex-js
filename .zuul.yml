@@ -21,4 +21,6 @@ browsers:
     version: latest
 browserify:
   - transform: babelify
+    presets:
+      - es2015
   - debug: true

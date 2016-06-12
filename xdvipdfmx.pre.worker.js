@@ -1,7 +1,7 @@
 /**
- * Preamble to xdvipdfmx.js.
+ * Preamble to xdvipdfmx.worker.js.
  *
- * @license The preamble is copyright David Xu, 2016.
+ * @license The preamble and postamble are copyright (c) 2016 by David Xu.
  *
  * The rest of this file is a derivative work of the XeTeX system that is
  * Copyright (c) 1994-2008 by SIL International
@@ -33,24 +33,42 @@
  * dealings in this Software without prior written authorization from the
  * copyright holders.
  */
-/* global ENV, ENVIRONMENT_IS_NODE, FS, NODEFS, process */
 var Module = {
-  'thisProgram': 'cwd/xdvipdfmx',
-  'preInit': function() {
-    if (ENVIRONMENT_IS_NODE) {
-      FS.mkdir('cwd');
-      FS.mount(NODEFS, {'root': '.'}, 'cwd');
-    }
+  'thisProgram': './xdvipdfmx',
+  'print': function(data) {
+    self.postMessage({'channel': 'stdout', 'data': data});
   },
-  'preRun': function() {
-    if (ENVIRONMENT_IS_NODE) {
-      if (process.env['KPATHSEA_DEBUG']) {
-        ENV['KPATHSEA_DEBUG'] = process.env['KPATHSEA_DEBUG'];
-      }
-      ENV['TEXMFDIST'] = '{cwd,cwd/texlive,cwd/texlive-basic,cwd/texlive-full}/texmf-dist';
-      ENV['TEXMFCNF'] = 'cwd:$TEXMFDIST/web2c:';
-      ENV['TEXINPUTS'] = 'cwd:';
-      ENV['TEXFORMATS'] = 'cwd:';
-    }
+  'printErr': function(data) {
+    self.postMessage({'channel': 'stderr', 'data': data});
   }
 };
+
+// This mapping allows function calls to the FS object when using the closure
+// compiler. The FS object does not export any of its symbols, so the function
+// names would be flattened otherwise. We declare only a small subset here. More
+// entries can be added if necessary.
+var fsFunctionTable = function(fs) {
+  return {
+    'createDataFile': fs.createDataFile,
+    'createDevice': fs.createDevice,
+    'createFolder': fs.createFolder,
+    'createLazyFile': fs.createLazyFile,
+    'createPath': fs.createPath,
+    'mount': fs.mount,
+    'readFile': fs.readFile,
+    'symlink': fs.symlink,
+    'unlink': fs.unlink
+  };
+};
+
+var createModule = function(Module) {
+  Module['preInit'] = function() {
+    try {
+      FS.createDataFile('.', Module['thisProgram'], 'Dummy file for kpathsea.', true, true);
+    } catch (e) {
+      if (e.errno === ERRNO_CODES.EEXIST) {
+        return;
+      }
+      throw e;
+    }
+  };

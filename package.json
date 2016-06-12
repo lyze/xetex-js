@@ -23,9 +23,9 @@
     "clean": "rm -f workercontroller.umd.js workercontroller.umd.js.map workercontroller.umd.min.js workercontroller.umd.min.js.map",
     "doc": "jsdoc -d doc -c .jsdocconf.json -a all workercontroller.js ",
     "lint": "eslint --ext .js,.html .",
-    "test-node-raw": "tape -r ./test/babel test/node/**/*.js"
+    "test-node-raw": "tape -r ./test/babel test/node/**/*.js",
     "test-node": "tape -r ./test/babel test/node/**/*.js | tap-spec",
-    "test-browser-local": "npm run dist && zuul test/browser/**/*.js --local 8080 --coverage",
+    "test-browser-local": "zuul test/browser/**/*.js --local 8080 --coverage",
     "test": "npm run test-node && npm run test-browser-local",
     "start": "npm run rollup && http-server .",
     "prepublish": "npm run dist"

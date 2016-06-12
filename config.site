@@ -1,3 +1,5 @@
+CFLAGS='-g -O3'
+
 ac_cv_sizeof_char=1
 ac_cv_sizeof_int=4
 ac_cv_sizeof_long=4
