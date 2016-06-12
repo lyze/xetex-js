@@ -33,7 +33,8 @@
  * dealings in this Software without prior written authorization from the
  * copyright holders.
  */
-var Module = {
+var Module = /** @dict */ {
+  'ENVIRONMENT': 'WORKER',
   'thisProgram': './xdvipdfmx',
   'print': function(data) {
     self.postMessage({'channel': 'stdout', 'data': data});

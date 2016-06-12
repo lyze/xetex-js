@@ -195,7 +195,7 @@ confirm-clean:
 clean-js: confirm-clean
 	rm -rf $(EMSCRIPTEN_BUILD_DIR)
 	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
-	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem $(XETEX_WORKER_JS) $(XETEX_WORKER_JS).mem $(XDVIPDFMX_EXE) $(XDVIPDFMX_JS) $(XDVIPDFMX_JS).mem $(XDVIPDFMX_WORKER_JS) $(XDVIPDFMX_WORKER_JS).mem
+	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem $(XETEX_WORKER_JS) $(XETEX_WORKER_JS).mem $(XDVIPDFMX_EXE) xdvipdfmx.bc $(XDVIPDFMX_JS) $(XDVIPDFMX_JS).mem $(XDVIPDFMX_WORKER_JS) $(XDVIPDFMX_WORKER_JS).mem
 	rm -f $(VERBOSE_LOG)
 
 .PHONY: clean
@@ -235,7 +235,7 @@ $(EXPAT_SOURCE_DIR)configure: $(EXPAT_ARCHIVE) | $(SOURCES_DIR)
 
 $(LIB_EXPAT): $(EXPAT_SOURCE_DIR)configure
 	mkdir -p $(EXPAT_BUILD_DIR)
-	cd $(EXPAT_BUILD_DIR) && emconfigure $$OLDPWD/$(EXPAT_SOURCE_DIR)configure CFLAGS='-O3 -Wno-error=implicit-function-declaration' >> $(VERBOSE_LOG)
+	cd $(EXPAT_BUILD_DIR) && emconfigure $$OLDPWD/$(EXPAT_SOURCE_DIR)configure CFLAGS='-g -O3 -Wno-error=implicit-function-declaration' >> $(VERBOSE_LOG)
 	emmake $(MAKE) -C $(EXPAT_BUILD_DIR) >> $(VERBOSE_LOG)
 	test -s $@ && touch $@
 
@@ -252,7 +252,7 @@ $(FONTCONFIG_SOURCE_DIR)configure: $(FONTCONFIG_ARCHIVE) | $(SOURCES_DIR)
 # specified the JavaScript version of fontconfig in the top-most configuration.
 $(LIB_FONTCONFIG): $(FONTCONFIG_SOURCE_DIR)configure $(LIB_EXPAT) $(LIB_FREETYPE)
 	mkdir -p $(FONTCONFIG_BUILD_DIR)
-	cd $(FONTCONFIG_BUILD_DIR) && EMCONFIGURE_JS=2 CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static FREETYPE_CFLAGS="-O3 -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/ -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) CFLAGS="-O3 -I$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/" LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/ >> $(VERBOSE_LOG)
+	cd $(FONTCONFIG_BUILD_DIR) && EMCONFIGURE_JS=2 CONFIG_SITE=$(JS_CONFIG_SITE_ABS) emconfigure $$OLDPWD/$(FONTCONFIG_SOURCE_DIR)configure --enable-static --with-expat-includes=$$OLDPWD/$(EXPAT_SOURCE_DIR)lib/ FREETYPE_CFLAGS="-g -O3 -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/ -I$$OLDPWD/$(XETEX_BUILD_DIR)libs/freetype2/freetype2/" FREETYPE_LIBS=$$OLDPWD/$(LIB_FREETYPE) LDFLAGS=-L$$OLDPWD/$(EXPAT_BUILD_DIR).libs/ >> $(VERBOSE_LOG)
 	emmake $(MAKE) -C $(FONTCONFIG_BUILD_DIR) >> $(VERBOSE_LOG)
 	test -s $@ && touch $@
 
@@ -266,10 +266,10 @@ NATIVE_XETEX = $(NATIVE_BUILD_DIR)texk/web2c/xetex
 .PHONY: native-tools
 native-tools: $(NATIVE_TOOLS)
 
-$(NATIVE_TOOLS): native-tools.stamp
+$(NATIVE_TOOLS): build-native-tools.stamp
 
-.INTERMEDIATE: native-tools.stamp
-native-tools.stamp: $(XETEX_SOURCE_DIR)build.sh
+.INTERMEDIATE: build-native-tools.stamp
+build-native-tools.stamp: $(XETEX_SOURCE_DIR)build.sh
 	@echo '>>>' Building native XeTeX distribution for compilation tools...
 	mkdir -p $(NATIVE_BUILD_DIR)
 	cd $(NATIVE_BUILD_DIR) && $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(NATIVE_TOOLS_CONF)
@@ -282,7 +282,7 @@ native-tools.stamp: $(XETEX_SOURCE_DIR)build.sh
 	$(MAKE) -C $(NATIVE_BUILD_DIR)libs/icu/icu-build/ >> $(VERBOSE_LOG)
 	touch $@
 
-$(NATIVE_XETEX): native-tools.stamp
+$(NATIVE_XETEX): build-native-tools.stamp
 	$(MAKE) -C $(NATIVE_BUILD_DIR)texk/web2c/ xetex >> $(VERBOSE_LOG)
 	test -s $@ && touch $@
 
@@ -301,18 +301,17 @@ $(LIB_FREETYPE): build-js-xetex-configured.stamp $(NATIVE_BUILD_DIR)libs/freetyp
 # XeTeX and xdvipdfmx
 ###############################################################################
 
-# We need -Wno-error=implicit-function-declaration to get past a (v)snprintf
-# configure check in kpathsea. We define ELIDE_CODE to avoid duplicate symbols
-# in kpathsea's own version of getopts.
 build-js-xetex-configured.stamp: $(XETEX_SOURCE_DIR)build.sh
 	@echo '>>>' Configuring xetex...
 	mkdir -p $(XETEX_BUILD_DIR)
-	cd $(XETEX_BUILD_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) CFLAGS='-O3 -Wno-error=implicit-function-declaration -DELIDE_CODE' >> $(VERBOSE_LOG)
+	cd $(XETEX_BUILD_DIR) && CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emconfigure $$OLDPWD/$(XETEX_SOURCE_DIR)source/configure $(XETEX_CONF) >> $(VERBOSE_LOG)
 	touch $@
 
+# We define ELIDE_CODE to avoid duplicate symbols in kpathsea's own version of
+# getopts.
 build-js-xetex-toplevel.stamp: build-js-xetex-configured.stamp $(LIB_FONTCONFIG)
 	@echo '>>>' Building xetex top level...
-	CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR) >> $(VERBOSE_LOG)
+	EMCC_CFLAGS=-DELIDE_CODE CONFIG_SITE=$(JS_CONFIG_SITE_ABS) EMCONFIGURE_JS=2 emmake $(MAKE) -C $(XETEX_BUILD_DIR) >> $(VERBOSE_LOG)
 	touch $@
 
 xetex_bc = $(XETEX_BUILD_DIR)texk/web2c/xetex
@@ -350,7 +349,8 @@ xetex_libs_dir = $(XETEX_BUILD_DIR)libs/
 xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/libgraphite2.a icu/icu-build/lib/libicuuc.a icu/icu-build/lib/libicudata.a teckit/libTECkit.a poppler/libpoppler.a libpng/libpng.a)
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
-# TODO: Using --closure 1 with -O2 or higher breaks xetex.js and xdvipdfmx.js. Maybe we can run closure compiler manually.
+# TODO: Using --closure 1 with -O2 or higher breaks xetex.js and xdvipdfmx.js.
+# It doesn't break the xetex.worker.js nor xdvipdfmx.worker.js, though.
 #
 # Status | Flags
 # -------|------
@@ -375,8 +375,8 @@ $(XELATEX_EXE): $(XELATEX_JS)
 	chmod a+x $@
 
 $(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js post.worker.js
-#	emcc -O3 --closure 1 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
-	emcc -g -O3 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s ALIASING_FUNCTION_POINTERS=0
+	emcc -O3 --closure 1 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
+#	emcc -g -O3 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTE_RCASTS=1 -s ALIASING_FUNCTION_POINTERS=0
 
 
 xdvipdfmx.bc: $(xdvipdfmx_bc)
@@ -418,19 +418,13 @@ $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR)
 
 else
 
-$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive-full.stamp
-	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) unpack.ins
-	TEXMF=texlive-full/texmf-dist//: TEXMFCNF=texlive-full/:texlive-full/texmf-dist/web2c/ TEXINPUTS=$(LATEX_BASE_SOURCE_DIR): $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) latex.ltx
+# $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive-full.stamp
+# 	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) unpack.ins
+# 	TEXMF=texlive-full/texmf-dist//: TEXMFCNF=texlive-full/:texlive-full/texmf-dist/web2c/ TEXINPUTS=$(LATEX_BASE_SOURCE_DIR): $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) latex.ltx
 
-# You can also build with the xelatex JS. Requires
-#     ENV.TEXMFDIST = '{cwd,cwd/texlive,cwd/texlive-basic,cwd/texlive-full}/texmf-dist';
-#     ENV.TEXMFCNF = 'cwd/:$TEXMFDIST/web2c/:';
-#     ENV.TEXINPUTS = 'cwd/:';
-#     ENV.TEXFORMATS = 'cwd/:';
-
-# $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(XELATEX) $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive-full.stamp
-#	TEXINPUTS=cwd/base/: ./$(XELATEX) -ini -etex -output-directory=cwd/base/ unpack.ins
-#	TEXINPUTS=cwd/base/: ./$(XELATEX) -ini -etex -output-directory=cwd/base/ latex.ltx
+$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(XELATEX) $(LATEX_BASE_SOURCE_DIR) texlive-full.stamp
+	TEXINPUTS=cwd/base/: ./$(XELATEX_EXE) -ini -etex -output-directory=cwd/base/ unpack.ins
+	TEXINPUTS=cwd/base/: ./$(XELATEX_EXE) -ini -etex -output-directory=cwd/base/ latex.ltx
 
 endif # USE_SYSTEM_TL
 

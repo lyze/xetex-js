@@ -163,4 +163,10 @@ trickery to have `kpathsea` search `/cwd` as well.
 
 # License
 
-Distributed under the MIT license. Refer to [LICENSE](LICENSE) for more details.
+The files `xdvipdfmx`, `xdvipdfmx.js`, and `xdvipdfmx.worker.js` are distributed
+under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+The remainder of the files are distributed under the MIT license. Refer to
+[LICENSE](LICENSE) for more details.

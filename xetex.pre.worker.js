@@ -27,8 +27,14 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
+ * Except as contained in this notice, the name of the copyright holders shall
+ * not be used in advertising or otherwise to promote the sale, use or other
+ * dealings in this Software without prior written authorization from the
+ * copyright holders.
  */
-var Module = {
+var Module = /** @dict */ {
+  'ENVIRONMENT': 'WORKER',
   'thisProgram': './xelatex',
   'print': function(data) {
     self.postMessage({'channel': 'stdout', 'data': data});

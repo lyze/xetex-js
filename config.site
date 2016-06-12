@@ -1,4 +1,4 @@
-CFLAGS='-g -O3'
+CFLAGS='-g -O3 -Wno-error=implicit-function-declaration'
 
 ac_cv_sizeof_char=1
 ac_cv_sizeof_int=4
