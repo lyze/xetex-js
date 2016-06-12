@@ -3,8 +3,11 @@
     <script src="../workercontroller.umd.js"></script>
     <script>
       /* global workercontroller */
+      var backend = new workercontroller.XdvipdfmxController(
+        '../xdvipdfmx.worker.js');
+      backend.texLiveManifestUrl = '../texlive.lst';
       var controller = new workercontroller.XeLaTeXController(
-        '../xetex.worker.js');
+        backend, '../xetex.worker.js');
       controller.xelatexFmtUrl = '../xelatex.fmt';
       controller.texLiveManifestUrl = '../texlive.lst';
 
@@ -22,6 +25,7 @@
       // requests compile
       var autoReload = false;
       var reloaded = doReload();
+      var isCompiling = false;
 
       document.addEventListener('DOMContentLoaded', function() {
         var autoReloadCheckbox = document.getElementById('auto-reload');
@@ -31,34 +35,32 @@
 
         var form = document.getElementById('form');
         var sourceTextArea = document.getElementById('source');
+        var previewIFrame = document.getElementById('preview');
+
+        var doCompile = function() {
+          console.log('Performing compilation...');
+          controller.compile(sourceTextArea.value).then(function(pdfData) {
+            console.log('Compilation complete.');
+            var pdfBlob = new Blob([pdfData], {type: 'application/pdf'});
+            var previewUrl = URL.createObjectURL(pdfBlob);
+            previewIFrame.src = previewUrl;
+          }, function(error) {
+            console.error('Compilation error', error);
+          }).then(function() {
+            if (autoReload) {
+              reloaded = doReload();
+            } else {
+              reloaded = null;
+            }
+          });
+        };
+
         form.addEventListener('submit', function(e) {
           e.preventDefault();
-          var doCompile = function() {
-            console.log('Performing compilation...');
-            controller.createDataFile('/', 'source.tex', sourceTextArea.value,
-                                      false, true)
-                      .then(function(result) {
-                        console.log('source textarea: FS.createDataFile', result);
-                      }, function(error) {
-                        console.log('source textarea: FS.createDataFile', error);
-                      });
-            controller.sendMessage({
-              namespace: 'Module', command: 'callMain',
-              // uncomment below to debug kpathsea search paths
-              // arguments: [['-kpathsea-debug=-1', '-interaction=nonstopmode', 'source.tex']]
-              arguments: [['-interaction=nonstopmode', 'source.tex']]
-            }).then(function(result) {
-              console.log('compile: Module.callMain', result);
-            }, function(error) {
-              console.error('compile: Module.callMain', error);
-            }).then(function() {
-              if (autoReload) {
-                reloaded = doReload();
-              } else {
-                reloaded = null;
-              }
-            });
-          };
+          if (isCompiling) {
+            return;
+          }
+          isCompiling = true;
           if (!reloaded) {
             reloaded = doReload();
           }
@@ -74,6 +76,7 @@
       <label for="source">Source</label>
       <textarea id="source"></textarea>
       <input type="submit" value="Compile">
+      <iframe id="preview"></iframe>
     </form>
 
   </body>

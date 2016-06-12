@@ -55,7 +55,6 @@ const assertFileHasContentAsync = (t, controller, filename) => {
 test('xetex.worker.js can compile hello_world.tex to hello_world.xdv', t => {
   var controller = new XeLaTeXController(
     new XdvipdfmxController('xdvipdfmx.worker.js'), 'xetex.worker.js');
-  controller.trimManifestPrefix = 'texlive-basic/';
   return controller.reload()
     .then(_ => controller.createDataFile(
       '.', 'hello_world.tex',
@@ -72,7 +71,7 @@ test('XeLaTeXController can compile hello_world.tex to hello_world.pdf', t => {
     new XdvipdfmxController('xdvipdfmx.worker.js'), 'xetex.worker.js');
   return xelatex.reload()
     .then(_ => {
-      return xelatex.compileSourceString(
+      return xelatex.compile(
         '\\documentclass{article}\\begin{document}Hello, world!\\end{document}')
         .then(data => {
           t.ok(data.length, 'PDF content should be nonempty');

@@ -399,7 +399,6 @@ export const TeXLiveMixin = superClass => class extends superClass {
       // later ones in the kpathsea search path.
       this.createDataFile('/', 'texmf.cnf', texMfCnfContent,
                           getTransferList(texMfCnfContent), true),
-
       doXhr('GET', this.texLiveManifestUrl)
         .then(xhr => this._prepareTeXLiveFromManifest(xhr.response),
               xhr => {
@@ -516,9 +515,9 @@ export class XeLaTeXController extends TeXLiveMixin(WorkerController) {
    * bytes of the compiled PDF
    * @see WorkerController#invokeMain
    */
-  compileSourceString(source, sourcePath = 'source.tex',
-                      options = ['-interaction=nonstopmode', '-no-pdf'],
-                      outputPath = basename(sourcePath) + '.xdv') {
+  compile(source, sourcePath = 'source.tex',
+          options = ['-interaction=nonstopmode', '-no-pdf'],
+          outputPath = basename(sourcePath) + '.xdv') {
     var [head, tail] = splitPath(sourcePath);
     var pathEnsured;
     if (head === '/' || head === '.') {
