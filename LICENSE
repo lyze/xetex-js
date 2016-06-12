@@ -1,13 +1,12 @@
 The MIT License (MIT)
 
-Unless otherwise indicated, the modifications are copyright (c) 2016 by David Xu.
-
-Based on work of:
-
 The XeTeX typesetting system
 (an extended version of Donald Knuth's TeX)
 
-The XeTeX changes/additions are
+Unless otherwise indicated, the changes/additions are 
+Copyright (c) 2016 by David Xu.
+
+Based on work of earlier work on the XeTeX typesetting system that is
 Copyright (c) 1994-2008 by SIL International
 Copyright (c) 2009-2012 by Jonathan Kew
 Copyright (c) 2010-2012 by Han The Thanh
