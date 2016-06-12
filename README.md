@@ -54,6 +54,15 @@ and
 [FS API](https://kripken.github.io/emscripten-site/docs/api_reference/Filesystem-API.html)s.
 
 
+## Running the tests
+
+0.   `npm install`
+1.   `make texlive.lst`
+2.   `npm start`
+     1.   Watch the automated node-based tests.
+     2.   Open your browser at the specified URL to run the local zuul tests.
+
+
 ## Running the example
 
 The example uses the TeX Live basic distribution. An internet connection is

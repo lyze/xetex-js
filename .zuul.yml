@@ -1,6 +1,6 @@
 ui: tape
 server: "http-server -p $ZUUL_PORT"
-browsers:
+browsers: # not currently used
   - name: ipad
     version: latest
   - name: firefox
