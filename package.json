@@ -4,29 +4,34 @@
   "description": "JavaScript port of XeTeX",
   "author": "David Xu",
   "keywords": [
-    "xetex",
+    "latex",
+    "pdf",
     "tex",
-    "pdf"
+    "xdvipdfmx",
+    "xelatex",
+    "xetex"
   ],
   "homepage": "https://www.github.come/lyze/xetex-js",
   "license": "MIT",
   "main": "xetex.js",
-  "browser": "xetexcontroller.umd.js",
-  "jsnext:main": "xetexcontroller.js",
+  "browser": "workercontroller.umd.js",
+  "jsnext:main": "workercontroller.js",
   "repository": {
     "type": "git",
     "url": "https://www.github.com/lyze/xetex-js.git"
   },
   "scripts": {
     "rollup": "rollup -c",
-    "dist": "npm run rollup",
+    "dist": "make && npm run rollup",
     "clean": "rm -f workercontroller.umd.js workercontroller.umd.js.map workercontroller.umd.min.js workercontroller.umd.min.js.map",
     "doc": "jsdoc -d doc -c .jsdocconf.json -a all workercontroller.js ",
     "lint": "eslint --ext .js,.html .",
     "test-node-raw": "tape -r ./test/babel test/node/**/*.js",
     "test-node": "tape -r ./test/babel test/node/**/*.js | tap-spec",
-    "test-browser-local": "zuul test/browser/**/*.js --local 8080 --coverage",
-    "test": "npm run test-node && npm run test-browser-local",
+    "test-browser": "zuul --coverage -- test/browser/**/*.js",
+    "test-browser-local": "zuul --local 8080 --coverage -- test/browser/**/*.js",
+    "test-local": "npm run test-node && npm run test-browser-local",
+    "test": "npm run dist && npm run test-node && npm run test-browser",
     "start": "npm run rollup && http-server .",
     "prepublish": "npm run dist"
   },
@@ -54,15 +59,5 @@
     "tape": "^4.5.1",
     "zuul": "^3.10.1"
   },
-  "private": true,
-  "testling": {
-    "browsers": [
-      "android-browser/4.2..latest",
-      "chrome/32.0..latest",
-      "firefox/29.0..latest",
-      "opera/19..latest",
-      "safari/7.1..latest"
-    ],
-    "server": "http-server ."
-  }
+  "private": true
 }

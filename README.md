@@ -58,7 +58,7 @@ and
 
 0.   `npm install`
 1.   `make texlive.lst`
-2.   `npm start`
+2.   `npm run test-local`
      1.   Watch the automated node-based tests.
      2.   Open your browser at the specified URL to run the local zuul tests.
 
@@ -71,9 +71,7 @@ required to download it.
 0.  `npm install`
 1.  `make texlive.lst`
 2.   `npm start`
-3.   Visit `example/index.html`.
-
-Note: The example doesn't do anything interesting yet!
+3.   Visit `example/index.html`. Optionally open the developer console as well.
 
 
 ## Known limitations

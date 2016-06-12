@@ -1,21 +1,11 @@
 ui: tape
 server: "http-server -p $ZUUL_PORT"
-browsers: # not currently used
-  - name: ipad
-    version: latest
+browsers:
   - name: firefox
-    version: latest
-  - name: iphone
-    version: latest
-  - name: safari
     version: latest
   - name: chrome
     version: latest
-  - name: internet explorer
-    version: latest
   - name: microsoftedge
-    version: latest
-  - name: opera
     version: latest
   - name: android
     version: latest
