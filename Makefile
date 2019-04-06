@@ -34,6 +34,7 @@ MAKEFLAGS += --no-builtin-rules # --warn-undefined-variables
 # BAD    | -O3 --closure 1
 EM_LINK_OPT_WORKAROUND_FLAGS = -O3
 EM_LINK_OPT_REGULAR_FLAGS = -O3 --closure 1
+EM_LINK_FLAGS =
 
 # Uncomment to use the system installation of TeX Live to build xelatex.fmt.
 # USE_SYSTEM_TL = 1
@@ -366,8 +367,7 @@ xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/lib
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
 $(XETEX_JS): xetex.pre.js $(xetex_bc)
-	em++ $(EM_LINK_OPT_WORKAROUND_FLAGS) --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WASM=0
-#	em++ -g $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=2
+	em++ $(EM_LINK_FLAGS) $(EM_LINK_OPT_WORKAROUND_FLAGS) --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WASM=0
 
 $(XELATEX_JS): $(XETEX_JS)
 	ln -srf $< $@
@@ -379,19 +379,16 @@ $(XELATEX_EXE): $(XELATEX_JS)
 	chmod a+x $@
 
 $(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js post.worker.js
-	emcc $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
-#	emcc -g $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s ALIASING_FUNCTION_POINTERS=0
-
+	emcc $(EM_LINK_FLAGS) $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
 
 xdvipdfmx.bc: $(xdvipdfmx_bc)
 	ln -srf $< $@
 
 $(XDVIPDFMX_JS): xdvipdfmx.bc xdvipdfmx.pre.js
-	emcc $(EM_LINK_OPT_WORKAROUND_FLAGS) --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
-#	emcc -g $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=2
+	emcc $(EM_LINK_FLAGS) $(EM_LINK_OPT_WORKAROUND_FLAGS) --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
 
 $(XDVIPDFMX_WORKER_JS): xdvipdfmx.bc xdvipdfmx.pre.worker.js post.worker.js
-	emcc $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xdvipdfmx.pre.worker.js --post-js post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
+	emcc $(EM_LINK_FLAGS) $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xdvipdfmx.pre.worker.js --post-js post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
 
 .DELETE_ON_ERROR: $(XDVIPDFMX_EXE)
 $(XDVIPDFMX_EXE): $(XDVIPDFMX_JS)
@@ -440,6 +437,7 @@ $(INSTALL_TL_UNX_ARCHIVE):
 # This part can be easily customized to your liking.
 .DELETE_ON_ERROR: texlive.lst
 texlive.lst: texlive-$(TEXLIVE_INSTALL_TYPE).stamp
+	: > $@
 	cd texlive-$(TEXLIVE_INSTALL_TYPE) && find * -type f -exec echo {} texlive-$(TEXLIVE_INSTALL_TYPE)/{} \; >> $$OLDPWD/$@
 
 texlive-basic.profile texlive-small.profile texlive-full.profile: texlive-%.profile :
