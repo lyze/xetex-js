@@ -194,7 +194,7 @@ confirm-clean:
 .PHONY: clean-js
 clean-js: confirm-clean
 	rm -rf $(EMSCRIPTEN_BUILD_DIR)
-	rm -rf build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
+	rm -rf build-native-tools.stamp build-js-xetex-configured.stamp build-js-xetex-toplevel.stamp
 	rm -f $(XETEX_JS) $(XETEX_JS).mem $(XELATEX_EXE) $(XELATEX_JS) $(XELATEX_JS).mem $(XETEX_WORKER_JS) $(XETEX_WORKER_JS).mem $(XDVIPDFMX_EXE) xdvipdfmx.bc $(XDVIPDFMX_JS) $(XDVIPDFMX_JS).mem $(XDVIPDFMX_WORKER_JS) $(XDVIPDFMX_WORKER_JS).mem
 	rm -f $(VERBOSE_LOG)
 
@@ -221,7 +221,7 @@ $(XETEX_ARCHIVE):
 
 # Patch some freetype macros to avoid multiply-defined symbols because
 # Emscripten assumes a monolithic model for linking.
-$(XETEX_SOURCE_DIR)build.sh: $(XETEX_ARCHIVE)
+$(XETEX_SOURCE_DIR)build.sh: $(XETEX_ARCHIVE) | $(SOURCES_DIR)
 	tar xf $< -C $(SOURCES_DIR)
 	cd $(SOURCES_DIR) && patch -p0 < $$OLDPWD/freetype-internal-ftrfork.h.patch
 	test -s $@ && touch $@
@@ -268,7 +268,6 @@ native-tools: $(NATIVE_TOOLS)
 
 $(NATIVE_TOOLS): build-native-tools.stamp
 
-.INTERMEDIATE: build-native-tools.stamp
 build-native-tools.stamp: $(XETEX_SOURCE_DIR)build.sh
 	@echo '>>>' Building native XeTeX distribution for compilation tools...
 	mkdir -p $(NATIVE_BUILD_DIR)
@@ -327,9 +326,10 @@ xetex.stamp: build-js-xetex-toplevel.stamp $(NATIVE_TOOLS)
 	else \
 		echo '>>>' First xetex make attempt failed. && \
 		echo '>>>' Replacing icu binaries from $(NATIVE_BUILD_DIR)... && \
+		mkdir -p $(XETEX_BUILD_DIR)libs/icu/icu-build/bin/ && \
 		cp --preserve=mode $(NATIVE_ICU_TOOLS) $(XETEX_BUILD_DIR)libs/icu/icu-build/bin/ && \
 		echo '>>>' Warning: Using stub data for libicudata.a because compilation of assembly section is not directly supported by emcc. && \
-		cp $(XETEX_BUILD_DIR)libs/icu/icu-build/stubdata/libicudata.a $(XETEX_BUILD_DIR)libs/icu/icu-build/lib/libicudata.a && \
+		cp $(NATIVE_BUILD_DIR)libs/icu/icu-build/stubdata/libicudata.a $(XETEX_BUILD_DIR)libs/icu/icu-build/lib/libicudata.a && \
 		echo '>>>' Replacing web2c binaries from $(NATIVE_BUILD_DIR)... && \
 		cp --preserve=mode $(NATIVE_WEB2C) $(XETEX_BUILD_DIR)texk/web2c/ && \
 		cp --preserve=mode $(NATIVE_WEB2C_WEB2C) $(XETEX_BUILD_DIR)texk/web2c/web2c/ && \
@@ -362,8 +362,8 @@ xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xete
 # BAD    | -O3 --closure 1
 
 $(XETEX_JS): xetex.pre.js $(xetex_bc)
-	em++ -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
-#	em++ -g -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+	em++ -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
+#	em++ -g -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=2
 
 $(XELATEX_JS): $(XETEX_JS)
 	ln -srf $< $@

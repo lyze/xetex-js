@@ -14,3 +14,9 @@ ac_cv_alignof_void_p=4
 
 # To pass a configure check for xdvipdfmx in xetex
 cho_cv_have_freetype=yes
+
+# AC_TRY_LINK checks executability, but emscripten doesn't produce executables.
+# Bypass the checks below.
+ac_cv_namespace_ok=yes  # xetex libs ICU
+ac_cv_override_cxx_allocation_ok=yes  # xetex libs ICU
+ac_cv_override_placement_new_ok=yes  # xetex libs ICU
