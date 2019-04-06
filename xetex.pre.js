@@ -44,8 +44,11 @@ var Module = {
   },
   'preRun': function() {
     if (ENVIRONMENT_IS_NODE) {
-      ENV['TEXMFDIST'] = '{cwd,cwd/texlive,cwd/texlive-basic,cwd/texlive-full}/texmf-dist';
-      ENV['TEXMFCNF'] = 'cwd:$TEXMFDIST/web2c:';
+      if (process.env['KPATHSEA_DEBUG']) {
+        ENV['KPATHSEA_DEBUG'] = process.env['KPATHSEA_DEBUG'];
+      }
+      ENV['TEXMFDIST'] = 'cwd/texlive-{basic,small,full}/texmf-dist:';
+      ENV['TEXMFCNF'] = 'cwd:cwd/texlive-{basic,small,full}:cwd/texlive-{basic,small,full}/texmf-dist/web2c:';
       ENV['TEXINPUTS'] = 'cwd:';
       ENV['TEXFORMATS'] = 'cwd:';
     }

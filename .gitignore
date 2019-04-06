@@ -15,3 +15,13 @@ build-*/
 
 # Node
 node_modules/
+
+# Other build artifacts
+base/
+install-tl-*/
+texlive-*/
+xdvipdfmx*
+xetex*
+xelatex*
+texlive.lst
+workercontroller.umd.js

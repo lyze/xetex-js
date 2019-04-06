@@ -20,6 +20,21 @@
 MAKEFLAGS += --no-builtin-rules # --warn-undefined-variables
 .SUFFIXES:
 
+
+# TODO: Using --closure 1 with -O2 or higher breaks xetex.js and xdvipdfmx.js.
+# It doesn't break the xetex.worker.js nor xdvipdfmx.worker.js, though.
+#
+# Status | Flags
+# -------|------
+# OK     | -O2 --closure 1 --js-opts 0
+# OK     | -O2
+# OK     | -O3
+# OK     | --closure 1
+# BAD    | -O2 --closure 1
+# BAD    | -O3 --closure 1
+EM_LINK_OPT_WORKAROUND_FLAGS = -O3
+EM_LINK_OPT_REGULAR_FLAGS = -O3 --closure 1
+
 # Uncomment to use the system installation of TeX Live to build xelatex.fmt.
 # USE_SYSTEM_TL = 1
 
@@ -71,6 +86,7 @@ LATEX_BASE_ARCHIVE = base.zip
 LATEX_BASE_SOURCE_DIR = base/
 LATEX_BASE_ARCHIVE_URL = http://mirrors.ctan.org/macros/latex/base.zip
 
+TEXLIVE_INSTALL_TYPE = basic
 INSTALL_TL_UNX_ARCHIVE = install-tl-unx.tar.gz
 INSTALL_TL_UNX_ARCHIVE_URL = http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
 
@@ -201,7 +217,7 @@ clean-js: confirm-clean
 .PHONY: clean
 clean: clean-js
 	rm -rf $(LATEX_BASE_SOURCE_DIR)
-	rm -rf texlive/ install-tl* texlive-basic.profile texlive-basic.stamp texlive-full.profile texlive-full.stamp
+	rm -rf texlive/ install-tl* texlive-basic.profile texlive-basic.stamp texlive-small.profile texlive-small.stamp texlive-full.profile texlive-full.stamp
 	rm -rf xetex/
 	rm -rf $(NATIVE_BUILD_DIR) $(SOURCES_DIR)
 
@@ -349,21 +365,9 @@ xetex_libs_dir = $(XETEX_BUILD_DIR)libs/
 xetex_libs = $(addprefix $(xetex_libs_dir), harfbuzz/libharfbuzz.a graphite2/libgraphite2.a icu/icu-build/lib/libicuuc.a icu/icu-build/lib/libicudata.a teckit/libTECkit.a poppler/libpoppler.a libpng/libpng.a)
 xetex_link = $(web2c_objs) $(LIB_FONTCONFIG) $(xetex_web2c_dir)libxetex.a $(xetex_libs) $(LIB_EXPAT) $(xetex_libs_dir)freetype2/libfreetype.a $(xetex_libs_dir)zlib/libz.a $(xetex_web2c_dir)lib/lib.a $(XETEX_BUILD_DIR)texk/kpathsea/.libs/libkpathsea.a -nodefaultlibs -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic -lm -lgcc_eh -lgcc -lc -lgcc_eh -lgcc
 
-# TODO: Using --closure 1 with -O2 or higher breaks xetex.js and xdvipdfmx.js.
-# It doesn't break the xetex.worker.js nor xdvipdfmx.worker.js, though.
-#
-# Status | Flags
-# -------|------
-# OK     | -O2 --closure 1 --js-opts 0
-# OK     | -O2
-# OK     | -O3
-# OK     | --closure 1
-# BAD    | -O2 --closure 1
-# BAD    | -O3 --closure 1
-
 $(XETEX_JS): xetex.pre.js $(xetex_bc)
-	em++ -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
-#	em++ -g -O3 --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=2
+	em++ $(EM_LINK_OPT_WORKAROUND_FLAGS) --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WASM=0
+#	em++ -g $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xetex.pre.js -o $@ $(xetex_link) -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=2
 
 $(XELATEX_JS): $(XETEX_JS)
 	ln -srf $< $@
@@ -375,19 +379,19 @@ $(XELATEX_EXE): $(XELATEX_JS)
 	chmod a+x $@
 
 $(XETEX_WORKER_JS): $(xetex_bc) xetex.pre.worker.js post.worker.js
-	emcc -O3 --closure 1 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[]
-#	emcc -g -O3 --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTE_RCASTS=1 -s ALIASING_FUNCTION_POINTERS=0
+	emcc $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
+#	emcc -g $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xetex.pre.worker.js --post-js post.worker.js -o $@ $(xetex_link) -s INVOKE_RUN=0 -s TOTAL_MEMORY=536870912 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=1 -s SAFE_HEAP=1 -s EMULATE_FUNCTION_POINTER_CASTS=1 -s ALIASING_FUNCTION_POINTERS=0
 
 
 xdvipdfmx.bc: $(xdvipdfmx_bc)
 	ln -srf $< $@
 
 $(XDVIPDFMX_JS): xdvipdfmx.bc xdvipdfmx.pre.js
-	emcc -O3 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[]
-#	emcc -g -O2 --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ASSERTIONS=2
+	emcc $(EM_LINK_OPT_WORKAROUND_FLAGS) --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
+#	emcc -g $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xdvipdfmx.pre.js $< -o $@ -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=2
 
 $(XDVIPDFMX_WORKER_JS): xdvipdfmx.bc xdvipdfmx.pre.worker.js post.worker.js
-	emcc -O3 --closure 1 --pre-js xdvipdfmx.pre.worker.js --post-js post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[]
+	emcc $(EM_LINK_OPT_REGULAR_FLAGS) --pre-js xdvipdfmx.pre.worker.js --post-js post.worker.js $< -o $@ -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=[] -s ERROR_ON_UNDEFINED_SYMBOLS=0
 
 .DELETE_ON_ERROR: $(XDVIPDFMX_EXE)
 $(XDVIPDFMX_EXE): $(XDVIPDFMX_JS)
@@ -418,15 +422,11 @@ $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR)
 
 else
 
-# $(LATEX_BASE_SOURCE_DIR)latex.fmt: $(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) texlive-full.stamp
-# 	TEXINPUTS=$(LATEX_BASE_SOURCE_DIR) $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) unpack.ins
-# 	TEXMF=texlive-full/texmf-dist//: TEXMFCNF=texlive-full/:texlive-full/texmf-dist/web2c/ TEXINPUTS=$(LATEX_BASE_SOURCE_DIR): $(NATIVE_XETEX) -ini -etex -output-directory=$(LATEX_BASE_SOURCE_DIR) latex.ltx
-
-$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(XELATEX) $(LATEX_BASE_SOURCE_DIR) texlive-full.stamp
+$(LATEX_BASE_SOURCE_DIR)latex.fmt: $(XELATEX) $(LATEX_BASE_SOURCE_DIR) texlive-$(TEXLIVE_INSTALL_TYPE).stamp
 	TEXINPUTS=cwd/base/: ./$(XELATEX_EXE) -ini -etex -output-directory=cwd/base/ unpack.ins
 	TEXINPUTS=cwd/base/: ./$(XELATEX_EXE) -ini -etex -output-directory=cwd/base/ latex.ltx
 
-endif # USE_SYSTEM_TL
+endif  # USE_SYSTEM_TL
 
 
 ###############################################################################
@@ -439,41 +439,43 @@ $(INSTALL_TL_UNX_ARCHIVE):
 # later consulted via XHR in the example to load the texlive tree for kpathsea.
 # This part can be easily customized to your liking.
 .DELETE_ON_ERROR: texlive.lst
-texlive.lst: texlive-basic.stamp
-	cd texlive-basic && find * -type f -exec echo {} texlive-basic/{} \; >> $$OLDPWD/$@
+texlive.lst: texlive-$(TEXLIVE_INSTALL_TYPE).stamp
+	cd texlive-$(TEXLIVE_INSTALL_TYPE) && find * -type f -exec echo {} texlive-$(TEXLIVE_INSTALL_TYPE)/{} \; >> $$OLDPWD/$@
 
-texlive-basic.stamp: $(INSTALL_TL_UNX_ARCHIVE)
-	mkdir -p texlive-basic/
+texlive-basic.profile texlive-small.profile texlive-full.profile: texlive-%.profile :
+	mkdir -p texlive-$*/
 # prepare a profile to install texlive
-	echo selected_scheme scheme-basic > texlive-basic.profile
-	echo TEXDIR texlive-basic/ >> texlive-basic.profile
-	echo TEXMFLOCAL texlive-basic/texmf-local >> texlive-basic.profile
-	echo TEXMFSYSVAR texlive-basic/texmf-var >> texlive-basic.profile
-	echo TEXMFSYSCONFIG texlive-basic/texmf-config >> texlive-basic.profile
-	echo TEXMFVAR texlive-basic/texmf-var >> texlive-basic.profile
-# Now install texlive locally. This is a kludge that will break if there are
-# multiple install-tl-XXXFDATEXXX directories that were previously extracted.
+	echo selected_scheme scheme-$* > texlive-$*.profile
+	echo TEXDIR `pwd`/texlive-$*/ >> texlive-$*.profile
+	echo TEXMFLOCAL `pwd`/texlive-$*/texmf-local >> texlive-$*.profile
+	echo TEXMFSYSVAR `pwd`/texlive-$*/texmf-var >> texlive-$*.profile
+	echo TEXMFSYSCONFIG `pwd`/texlive-$*/texmf-config >> texlive-$*.profile
+	echo TEXMFVAR `pwd`/texlive-$*/texmf-var >> texlive-$*.profile
+	echo collection-fontsrecommended 1 >> texlive-$*.profile
+	echo collection-langarabic 1 >> texlive-$*.profile
+	echo collection-langchinese 1 >> texlive-$*.profile
+	echo collection-langcjk 1 >> texlive-$*.profile
+	echo collection-langcyrillic 1 >> texlive-$*.profile
+	echo collection-langczechslovak 1 >> texlive-$*.profile
+	echo collection-langenglish 1 >> texlive-$*.profile
+	echo collection-langeuropean 1 >> texlive-$*.profile
+	echo collection-langfrench 1 >> texlive-$*.profile
+	echo collection-langgerman 1 >> texlive-$*.profile
+	echo collection-langgreek 1 >> texlive-$*.profile
+	echo collection-langitalian 1 >> texlive-$*.profile
+	echo collection-langjapanese 1 >> texlive-$*.profile
+	echo collection-langkorean 1 >> texlive-$*.profile
+	echo collection-langother 1 >> texlive-$*.profile
+	echo collection-langpolish 1 >> texlive-$*.profile
+	echo collection-langportuguese 1 >> texlive-$*.profile
+	echo collection-langspanish 1 >> texlive-$*.profile
+
+texlive-basic-downloaded.stamp texlive-small-downloaded.stamp texlive-full-downloaded.stamp: texlive-%-downloaded.stamp : $(INSTALL_TL_UNX_ARCHIVE) texlive-%.profile
 	tar xf $(INSTALL_TL_UNX_ARCHIVE)
-	install-tl-*/install-tl -profile texlive-basic.profile
-# Clean out unneeded files
-	rm -rf texlive-basic/bin/ texlive-basic/tlpkg/ texlive-basic/texmf-dist/doc/ texlive-basic/texmf-var/doc/ texlive-basic/readme-html.dir/ texlive-basic/readme-txt.dir/ texlive-basic/index.html texlive-basic/doc.html texlive-basic/install-tl.log
-	find texlive-basic/ -executable -type f -exec rm {} +
+	install-tl-*/install-tl -profile texlive-$*.profile
 	touch $@
 
-texlive-full.stamp: $(INSTALL_TL_UNX_ARCHIVE)
-	mkdir -p texlive-full/
-# prepare a profile to install texlive
-	echo selected_scheme scheme-full > texlive-full.profile
-	echo TEXDIR `pwd`/texlive-full/ >> texlive-full.profile
-	echo TEXMFLOCAL `pwd`/texlive-full/texmf-local >> texlive-full.profile
-	echo TEXMFSYSVAR `pwd`/texlive-full/texmf-var >> texlive-full.profile
-	echo TEXMFSYSCONFIG `pwd`/texlive-full/texmf-config >> texlive-full.profile
-	echo TEXMFVAR `pwd`/texlive-full/texmf-var >> texlive-full.profile
-# Now install texlive locally. This is a kludge that will break if there are
-# multiple install-tl-XXXFDATEXXX directories that were previously extracted.
-	tar xf $(INSTALL_TL_UNX_ARCHIVE)
-	install-tl-*/install-tl -profile texlive-full.profile
-# Clean out unneeded files
-	rm -rf texlive-full/bin/ texlive-full/tlpkg/ texlive-full/texmf-dist/doc/ texlive-full/texmf-var/doc/ texlive-full/readme-html.dir/ texlive-full/readme-txt.dir/ texlive-full/index.html texlive-full/doc.html texlive-full/install-tl.log
-	find texlive-full/ -executable -type f -exec rm {} +
+texlive-basic.stamp texlive-small.stamp texlive-full.stamp: texlive-%.stamp : texlive-%-downloaded.stamp
+	rm -rf texlive-$*/bin/ texlive-$*/tlpkg/ texlive-$*/texmf-dist/doc/ texlive-$*/texmf-var/doc/ texlive-$*/readme-html.dir/ texlive-$*/readme-txt.dir/ texlive-$*/index.html texlive-$*/doc.html texlive-$*/install-tl.log
+	find texlive-$*/ -executable -type f -exec rm {} +
 	touch $@
